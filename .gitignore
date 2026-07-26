@@ -1,0 +1,23 @@
+# Local runtime state and dry-run delivery evidence
+state/
+outbox/
+incoming/
+logs/
+
+# Local configuration and secrets
+.env
+.env.*
+config.local.json
+
+# Node tooling
+node_modules/
+coverage/
+
+# Local GitNexus database (generated guidance files remain tracked)
+.gitnexus/
+
+# Editor and OS noise
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
