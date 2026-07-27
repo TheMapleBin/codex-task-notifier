@@ -1,112 +1,67 @@
-# Codex 接入与运行说明
+# Codex 受控接入说明
 
-本文件描述生产接入步骤。当前仓库不会自动修改用户的 Codex 配置、CC Switch 端口或 Windows 计划任务。
+## 当前操作结论
 
-## 1. 启动本地服务（dry-run）
-
-```powershell
-$env:CODEX_NOTIFY_HOME = "$env:LOCALAPPDATA\CodexOpenClawNotifier"
-npm run service
-```
-
-检查服务：
+现在不得启动生产 watcher，也不得修改 Codex Desktop 或 CLI 的全局配置。当前版本只允许本地代码检查与自动化测试：
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:17080/health
+npm run check
+npm test
 ```
 
-默认 adapter 是 `dry-run`；交付记录会写到：
+这些命令验证软件行为，不会向微信发送消息。阶段门禁、真实发送证据和剩余验收项以 [实施计划](implementation-plan.md) 与 [Codex / Claude 交接](claude-handoff.md) 为准。
+
+## 已冻结的运行环境
+
+下列对象已经存在，必须原样保留：
+
+- OpenClaw 安装和正在工作的 Gateway。
+- Gateway 的既有计划任务。
+- 两个既有微信 channel 配置。
+- `C:\Users\TheMapleBin\.codex\config.toml` 与当前 Codex 网络路由。
+
+不要删除、重新配置、重新登录、重新扫码或重复创建上述对象。不要查看、输出或提交其凭据、完整收件人地址、二维码材料、会话正文、prompt 或请求/响应正文。
+
+## 生产候选路径
+
+阶段 5 通过且用户明确授权后，唯一的生产候选是：
 
 ```text
-%LOCALAPPDATA%\CodexOpenClawNotifier\dry-run-deliveries.jsonl
+Codex rollout JSONL
+  -> 单进程 npm run watch
+  -> 持久 outbox
+  -> OpenClaw CLI
+  -> 已有 Gateway
+  -> 微信
 ```
 
-## 2. 配置 Codex Stop hook
+该 watcher 不会启动本地 HTTP listener。它使用已验证的 OpenClaw CLI 发送契约，account 和完整 target 只能由安全的进程环境注入，变量名为 `CODEX_NOTIFY_OPENCLAW_ACCOUNT` 与 `CODEX_NOTIFY_OPENCLAW_TARGET`。不要把值写进仓库、`config.toml`、脚本、命令历史或聊天内容。
 
-在用户级 `C:\Users\TheMapleBin\.codex\config.toml` 的现有 hooks 后追加以下内容。不要删除已有的 `SessionStart` hook。
+生产启动前的最小条件如下：
 
-```toml
-[[hooks.Stop]]
-
-[[hooks.Stop.hooks]]
-type = "command"
-command_windows = 'pwsh.exe -NoProfile -ExecutionPolicy Bypass -File "D:\Shared\codex-openclaw-notifier\scripts\codex-stop-hook.ps1"'
-timeout = 2
-status_message = "Queueing local Codex notification"
-```
-
-Codex 会要求审核并信任新 hook。完成信任后，Desktop 和交互式 CLI 的每一轮任务结束会写入本地通知队列。
-
-`Stop` 事件没有可靠的最终成功/失败语义，因此它会先产生“任务已停止，等待结果确认”。CLI wrapper 和可选会话观察器会补充更精确的终态；API 代理则独立报告网络/API 失败。
-
-## 3. 启用 CLI 精确终态
-
-对自动化任务使用 wrapper：
-
-```powershell
-npm run cli -- "只读分析当前仓库"
-```
-
-它等价于 `codex exec --json ...`，但会保留原始 stdout/stderr、读取 `turn.completed` / `turn.failed` / `error`，并将非零退出码写入本地队列。wrapper 启动的 Codex 会抑制 Stop hook，避免重复通知。
-
-若子进程以非零状态退出，即使此前 JSONL 中出现了 `turn.completed`，wrapper 仍以 `task_error` 和 `EXIT_n` 为准；若 wrapper 仍存活并观察到子进程 `SIGINT`，会写入 `turn_interrupted` 并返回常用退出码 `130`。强制杀死 wrapper 或系统崩溃无法由进程内代码保证即时入队，需由可选会话观察器在记录落盘后尽力恢复。
-
-## 4. 启用 API 错误兜底
-
-先以 dry-run 验证服务与代理：
-
-```powershell
-$env:CODEX_NOTIFY_PROXY_ENABLED = 'true'
-npm run service
-```
-
-确认 `http://127.0.0.1:15722` 正在监听后，才把用户级 Codex 配置的 custom provider `base_url` 从：
-
-```toml
-base_url = "http://127.0.0.1:15721/v1"
-```
-
-改为：
-
-```toml
-base_url = "http://127.0.0.1:15722/v1"
-```
-
-代理只监听 loopback，并固定转发到 `127.0.0.1:15721`。它不记录 Authorization、Cookie、prompt、源码、请求体或响应体；仅在 HTTP 4xx/5xx、连接失败、超时时入队一个最小错误事件。
-
-回滚：停止本地服务，再把 `base_url` 恢复为 `http://127.0.0.1:15721/v1`。
-
-## 5. 可选：会话 JSONL 观察器
-
-这是兼容性兜底，不是稳定公开接口。验证本机 Codex 版本后才开启：
-
-```powershell
-$env:CODEX_NOTIFY_WATCHER_ENABLED = 'true'
-npm run service
-```
-
-观察器默认忽略可识别的子代理记录，并会用 `task_complete.error` / `turn_aborted` 补充 Desktop 任务的具体失败或中断状态。它可以在对应终态到达时抑制尚未投递的通用 Stop 事件。
-
-## 6. 等待 OpenClaw 微信接入信息
-
-请提供下列任一种已验证接口，不要在聊天中发送 token：
-
-1. OpenClaw Gateway 的本地/远程地址、认证方式、发送消息方法和目标会话标识；或
-2. 一个能够安全调用的本机 OpenClaw CLI 命令格式及目标会话标识；或
-3. 现有 OpenClaw 部署目录和它的官方发送消息文档。
-
-收到后会实现 `src/adapters/openclaw.mjs`，将 token 放在 Windows Credential Manager 或由服务启动环境注入，不写入 Git、Codex `config.toml` 或通知正文。
-
-## 验证矩阵
-
-| 用例 | 预期 |
+| 条件 | 必需证据 |
 | --- | --- |
-| dry-run 单条事件 | pending 变为 delivered，生成 dry-run JSONL |
-| CLI 正常完成 | 一条 `turn_finished`，CLI stdout/stderr 不变 |
-| CLI 非零退出 | 一条 `task_error`，含 `EXIT_n`，无敏感正文 |
-| 上游返回 503 | Codex 仍看到原始 503，队列收到 `api_error` / `HTTP_503` |
-| 上游连接失败或超时 | Codex 看到 502/504，队列收到相应错误类型 |
-| Desktop 正常结束 | Stop hook 产生通用结束事件；启用观察器后以精确终态替换待投递事件 |
-| OpenClaw 离线 | 事件保留在 pending，服务恢复后重试 |
+| 发送契约 | 发送命令成功且收件人已确认收到；见 [发送契约](verified-openclaw-contract.md) |
+| Desktop 正常与 API 错误 | 每项均有事件捕获、outbox、发送成功、微信确认 |
+| CLI 正常与非零/API 错误 | 每项均有事件捕获、outbox、发送成功、微信确认 |
+| 用户中断和离线恢复 | 每项均有事件捕获、outbox、发送成功、微信确认 |
+| 运行范围 | 只启动一个 `npm run watch`，不增加 Gateway、服务或计划任务 |
 
-当前仓库已通过本地自动化测试覆盖该矩阵中的 503、连接失败、超时、CLI 非零退出、可观察到的中断、会话中断，以及 Stop hook 在服务不可用时的 incoming-fallback。它们是软件验证，不等同于已修改全局 Codex 配置、已运行真实 Desktop/CLI 任务或已收到微信消息的现场验收。
+未满足任何一项时，停止在当前阶段并报告缺失证据，不要“先部署再补测”。
+
+## 禁止启用的替代路径
+
+以下组件保留在仓库中用于开发、回归或阶段 4 的受控验证，不得作为当前生产方案启用：
+
+- `scripts/codex-stop-hook.ps1` 和任何 Codex Stop hook 配置。
+- `npm run cli` 包装器。它只适用于 `codex exec` 自动化入口，并非交互式 CLI 的替换。
+- `npm run proxy`、`CODEX_NOTIFY_PROXY_ENABLED`、端口 `15722` 和任何 `base_url` 改动。
+- 额外的 `npm run service` 常驻实例。
+
+只有存在一个已复现、watcher 与 wrapper 都漏报且透明代理可覆盖的 API 失败时，才可提出代理方案。此时必须先记录风险、回滚步骤和证据，并取得用户明确批准；批准前绝不改动 `base_url`。
+
+## 验收记录格式
+
+每次现场测试用不含敏感值的记录分成四列：事件已捕获、已入 outbox、发送命令成功、微信实际收到。没有最后一列的测试只能称为本机链路验证，不能称为微信通知验收。
+
+有关当前阻塞、提交基线和接手步骤，阅读 [Codex / Claude 交接](claude-handoff.md)。

@@ -2,7 +2,7 @@
 
 验证时间：2026-07-27。
 
-本机已使用现有 OpenClaw Gateway 与 `openclaw-weixin` 完成一次真实微信投递。发送命令以退出码 `0` 结束，随后由收件人在微信端确认实际收到。该证据只证明以下契约，不代表 watcher 已部署或 Codex 配置已切换。
+本机已使用现有 OpenClaw Gateway 与 `openclaw-weixin` 完成一次真实微信投递。发送命令以退出码 `0` 结束，随后由收件人在微信端确认实际收到。该证据只证明以下发送契约，不代表 watcher 已部署、Codex 配置已切换，或 Desktop/CLI 终态已被现场捕获。
 
 ```text
 openclaw message send \
@@ -18,4 +18,4 @@ openclaw message send \
 - adapter 丢弃 CLI stdout/stderr；仅以启动结果、超时和退出码决定 outbox 是否重试。
 - 发送命令不读取或写入 Gateway token、iLink token、cookie、二维码信息或会话正文。
 
-第 3 阶段的 watcher 使用此契约，但不启用 Stop hook、CLI wrapper、API proxy、15722 代理或 Codex 全局配置改动。
+第 3 阶段的 watcher 使用此契约，但不启用 Stop hook、CLI wrapper、API proxy、`15722` 代理或 Codex 全局配置改动。`openclaw channels status --deep`、`--dry-run`、Gateway 端口监听或 adapter 单元测试都不能替代本文件所记录的“发送命令成功 + 收件人确认”证据。
