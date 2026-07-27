@@ -16,6 +16,7 @@
 | `a24bef4` | 通过 PowerShell shim 安全执行 Windows OpenClaw | 26/26；本机真实命令退出码为 0 |
 | `071b203` | 刷新 GitNexus 生成文档 | 索引生成文件对齐 |
 | `373fd3d` | 通知附带净化后的最终 assistant 输出 | `npm run check` 与 `npm test` 通过，30/30；尚未做新增输出段的真实微信显示确认 |
+| `5d58398` | Windows DPAPI 轻量一键控制 | 31/31；隔离 watcher 的启动、去重、状态、停止与输出不泄密通过 |
 
 ## 阶段门禁
 
