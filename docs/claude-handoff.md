@@ -56,7 +56,7 @@ flowchart TB
 | 标签 | 当前已知事实 | 不能推出的结论 |
 | --- | --- | --- |
 | 实现完成 | watcher、outbox、OpenClaw adapter、可选 wrapper 都在代码中 | 不代表已运行或已向微信送达 |
-| 软件验证 | `npm run check` 和 `npm test` 均通过，测试数为 30 | 不代表真实 Codex 或微信现场行为 |
+| 软件验证 | `npm run check` 和 `npm test` 均通过，测试数为 31 | 不代表真实 Codex 或微信现场行为 |
 | 运输验证 | 一次真实 `openclaw message send` 成功退出，且收件人确认微信实际收到 | 不代表 Codex 终态被捕获 |
 | 现场验收 | CLI 正常完成用例已通过四层证据 | 只证明该用例，不代表全部生产验收完成 |
 
@@ -67,6 +67,12 @@ flowchart TB
 `373fd3d` 扩展了原先的元数据通知：watcher 只读取当前根任务最后一条 assistant `output_text`，可选 CLI wrapper 只读取最后一个 `item.completed` 的 `agent_message`。`createEvent` 在任何 outbox 或 adapter 处理前统一移除控制字符、遮盖明显的认证头、Cookie、token、API key、密码和 secret，并截断到 1200 个字符；格式化时仅在非空时追加“输出”段。
 
 这项扩展不允许提取、持久化或投递用户 prompt、用户消息、完整会话、原始 API 请求/响应或原始错误正文。API 失败或中断没有 assistant 结果时，输出段应缺省。2026-07-28 已通过的 CLI 正常完成验收发生在该提交之前，所以只能证明终态运输链路，不能证明新增输出段已在微信端显示。
+
+## 轻量一键入口
+
+仓库提供 `configure-notifier.cmd`、`start-notifier.cmd`、`notifier-status.cmd` 和 `stop-notifier.cmd`。首次配置由 Windows DPAPI 保护 account/target；后续启动不要求用户再次注入。实现只启动一个隐藏的 `node src/index.mjs watch`，复用现有 OpenClaw CLI 与 Gateway，不经过 npm，不新增 Gateway、HTTP listener、服务、计划任务或代理。运行目录固定隔离到 `%LOCALAPPDATA%\CodexOpenClawNotifier\live`，禁止为“清理”而删除旧默认 outbox。
+
+一键入口已做软件级启动、重复启动、状态、停止和敏感值不出现在输出中的测试，但没有自动启动真实生产 watcher。接手代理不得把脚本存在或测试通过写成微信现场验收完成。
 
 ## OpenClaw 路径
 

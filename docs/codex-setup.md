@@ -37,6 +37,10 @@ Codex rollout JSONL
 
 该 watcher 不会启动本地 HTTP listener。它使用已验证的 OpenClaw CLI 发送契约，account 和完整 target 只能由安全的进程环境注入，变量名为 `CODEX_NOTIFY_OPENCLAW_ACCOUNT` 与 `CODEX_NOTIFY_OPENCLAW_TARGET`。不要把值写进仓库、`config.toml`、脚本、命令历史或聊天内容。
 
+Windows 一键入口把“每次手动注入”缩减为一次配置：`configure-notifier.cmd` 使用当前 Windows 用户的 DPAPI 加密 account 和 target，`start-notifier.cmd` 解密后只注入新 watcher 子进程。`notifier-status.cmd` 和 `stop-notifier.cmd` 分别查看状态和停止该 PID。控制器不安装 OpenClaw、不新增 Gateway、不创建服务或计划任务；它直接启动一个隐藏的 Node watcher。独立运行目录为 `%LOCALAPPDATA%\CodexOpenClawNotifier\live`，用于隔离既有历史 outbox。
+
+这些入口只是轻量控制能力，并不自动跨过阶段 5/6 门禁。首次真实启用仍应使用新运行目录核对事件捕获、outbox、发送成功和微信实际收到，确认后再决定是否长期运行。
+
 watcher 会从当前根任务的 rollout 中提取最后一条 assistant `output_text`，CLI wrapper 则提取最后一个已完成的 `agent_message`。事件契约在持久化和发送前统一移除控制字符、遮盖明显凭据并截断到 1200 个字符；微信文本仅在结果非空时追加“输出”段。这个机制不提取、不持久化或投递用户消息，也不把原始 API 错误正文当作最终输出。新增输出字段已通过自动化测试，但尚未完成一次新的真实微信显示确认。
 
 生产启动前的最小条件如下：
@@ -47,7 +51,7 @@ watcher 会从当前根任务的 rollout 中提取最后一条 assistant `output
 | Desktop 正常与 API 错误 | 每项均有事件捕获、outbox、发送成功、微信确认 |
 | CLI 正常与非零/API 错误 | 每项均有事件捕获、outbox、发送成功、微信确认 |
 | 用户中断和离线恢复 | 每项均有事件捕获、outbox、发送成功、微信确认 |
-| 运行范围 | 只启动一个 `npm run watch`，不增加 Gateway、服务或计划任务 |
+| 运行范围 | 只启动一个 watcher（`npm run watch` 或 `start-notifier.cmd` 二选一），不增加 Gateway、服务或计划任务 |
 
 未满足任何一项时，停止在当前阶段并报告缺失证据，不要“先部署再补测”。
 

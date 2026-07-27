@@ -24,6 +24,16 @@ npm test
 npm run check
 ```
 
-`npm run service`、`npm run proxy`、Stop hook 和 CLI wrapper 仅保留作开发或阶段 4 验证，不属于当前生产路线。未来生产接入唯一候选是单进程 `npm run watch`，且只能在阶段 5 的真实现场验收完成、用户明确允许后启动。
+## Windows 一键控制
+
+首次双击 `configure-notifier.cmd`，输入一次既有 OpenClaw account 和完整 target。它们由 Windows DPAPI 按当前用户加密，保存于仓库外的 `%LOCALAPPDATA%\CodexOpenClawNotifier\secure`。之后使用：
+
+- `start-notifier.cmd`：后台启动唯一的轻量 watcher。
+- `notifier-status.cmd`：查看运行状态和新 outbox 计数，不显示凭据或消息正文。
+- `stop-notifier.cmd`：只停止该启动器记录的 watcher。
+
+启动器直接运行 `node src/index.mjs watch`，不经过 npm，不安装或启动第二套 OpenClaw/Gateway，也不创建服务、计划任务、代理或监听端口。运行数据使用新的 `%LOCALAPPDATA%\CodexOpenClawNotifier\live`，不会重放旧默认 outbox 中的历史失败事件。
+
+`npm run service`、`npm run proxy`、Stop hook 和 CLI wrapper 仅保留作开发或阶段 4 验证，不属于当前生产路线。未来生产接入唯一候选仍是单个 watcher，可由 `npm run watch` 或等价的 `start-notifier.cmd` 启动，但两者不能并行；只有阶段 5 的真实现场验收完成、用户明确允许后才能长期运行。
 
 不要将 Codex `base_url` 切换到 `15722`；只有出现 watcher 与 wrapper 均漏报、而透明代理可复现覆盖的具体案例后，才可提出该变更并先取得用户确认。
