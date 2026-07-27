@@ -78,6 +78,37 @@ function severityFor(kind, value) {
   return value;
 }
 
+function durationMs(value) {
+  if (value == null) return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 2_592_000_000) {
+    throw new Error("durationMs must be between 0 and 2592000000.");
+  }
+  return parsed;
+}
+
+function safeErrorCode(value) {
+  const normalized = cleanText(value, 40);
+  if (!normalized) return null;
+  const upper = normalized.toUpperCase();
+  if ([
+    "USER_INTERRUPTED",
+    "INTERRUPTED",
+    "ABORTED",
+    "CANCELLED",
+    "CODEX_TASK_ERROR",
+    "CODEX_SPAWN_FAILED",
+    "OTHER",
+    "UPSTREAM_CONNECTION_FAILED",
+    "UPSTREAM_TIMEOUT",
+    "SIGHUP",
+    "SIGINT",
+    "SIGTERM"
+  ].includes(upper)) return upper;
+  if (/^(EXIT_\d{1,3}|HTTP_[45]\d{2})$/.test(upper)) return upper;
+  return null;
+}
+
 export function createEvent(input) {
   if (!input || typeof input !== "object") {
     throw new Error("An event object is required.");
@@ -122,7 +153,8 @@ export function createEvent(input) {
     correlationKey,
     httpStatus,
     errorKind,
-    errorCode: cleanText(input.errorCode, 120)
+    errorCode: safeErrorCode(input.errorCode),
+    durationMs: durationMs(input.durationMs)
   });
 }
 
@@ -132,20 +164,32 @@ export function isTerminalOutcome(event) {
 
 export function formatEventForDelivery(event) {
   const titles = {
-    turn_stopped: "任务已停止，等待结果确认",
-    turn_finished: "任务已完成",
-    turn_interrupted: "任务被中断",
-    api_error: "API 或网关错误",
-    task_error: "任务执行失败",
-    delivery_error: "通知投递失败"
+    turn_stopped: "已停止",
+    turn_finished: "已完成",
+    turn_interrupted: "已中断",
+    api_error: "API 错误",
+    task_error: "执行失败",
+    delivery_error: "投递失败"
   };
-  const lines = [`[Codex] ${titles[event.kind] || "状态更新"}`];
-  if (event.surface !== "unknown") lines.push(`端: ${event.surface}`);
+  const lines = ["[Codex]", `来源: ${event.source}`];
   if (event.workspace) lines.push(`项目: ${event.workspace}`);
+  lines.push(`状态: ${titles[event.kind] || "状态更新"}`);
+  if (event.durationMs != null) lines.push(`耗时: ${formatDuration(event.durationMs)}`);
+  if (event.turnId) lines.push(`任务: ${event.turnId.slice(-12)}`);
   if (event.httpStatus) lines.push(`HTTP: ${event.httpStatus}`);
   if (event.errorKind) lines.push(`错误类型: ${event.errorKind}`);
-  if (event.errorCode) lines.push(`错误码: ${event.errorCode}`);
-  if (event.turnId) lines.push(`任务: ${event.turnId.slice(-12)}`);
-  lines.push(`时间: ${event.occurredAt}`);
   return lines.join("\n");
+}
+
+function formatDuration(value) {
+  if (value < 1_000) return "<1秒";
+  const seconds = Math.floor(value / 1_000);
+  const hours = Math.floor(seconds / 3_600);
+  const minutes = Math.floor((seconds % 3_600) / 60);
+  const remainingSeconds = seconds % 60;
+  const parts = [];
+  if (hours) parts.push(`${hours}小时`);
+  if (minutes) parts.push(`${minutes}分`);
+  if (remainingSeconds || parts.length === 0) parts.push(`${remainingSeconds}秒`);
+  return parts.join("");
 }

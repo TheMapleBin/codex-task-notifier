@@ -53,14 +53,19 @@ async function runProxy(config) {
 }
 
 async function runWatcher(config) {
+  const service = createNotifierService(config);
+  await service.start({ listen: false });
   const watcher = createSessionWatcher({
     sessionsDir: config.sessionsDir,
     pollIntervalMs: config.pollIntervalMs,
-    onEvent: (event) => sendEventToLocalService(config, event)
+    onEvent: (event) => service.submit(event)
   });
   await watcher.start();
-  process.stdout.write(`[codex-notify] watching ${config.sessionsDir}\n`);
-  installShutdown(() => watcher.close());
+  process.stdout.write(`[codex-notify] watching ${config.sessionsDir} (${config.adapter})\n`);
+  installShutdown(async () => {
+    await watcher.close();
+    await service.close();
+  });
 }
 
 async function main() {

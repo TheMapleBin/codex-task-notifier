@@ -11,6 +11,8 @@ test("event contract keeps only approved metadata", () => {
     requestId: "request-123",
     httpStatus: 503,
     errorKind: "http_status",
+    durationMs: 65_000,
+    errorCode: "private-prompt",
     authorization: "secret",
     prompt: "private prompt",
     responseBody: "private response"
@@ -18,10 +20,14 @@ test("event contract keeps only approved metadata", () => {
 
   assert.equal(event.workspace, "firmware-project");
   assert.equal(event.httpStatus, 503);
+  assert.equal(event.durationMs, 65_000);
+  assert.equal(event.errorCode, null);
   assert.equal("authorization" in event, false);
   assert.equal("prompt" in event, false);
   assert.equal("responseBody" in event, false);
   assert.match(formatEventForDelivery(event), /HTTP: 503/);
+  assert.match(formatEventForDelivery(event), /耗时: 1分5秒/);
+  assert.match(formatEventForDelivery(event), /来源: api-proxy/);
   assert.doesNotMatch(formatEventForDelivery(event), /private|secret/i);
 });
 

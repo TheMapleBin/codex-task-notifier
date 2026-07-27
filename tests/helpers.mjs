@@ -24,6 +24,13 @@ export function testConfig(home, overrides = {}) {
     upstream: new URL("http://127.0.0.1:15721"),
     upstreamTimeoutMs: 1_000,
     adapter: "dry-run",
+    openclaw: {
+      command: "openclaw",
+      channel: "openclaw-weixin",
+      account: "test-account",
+      target: "test-peer@test-account",
+      timeoutMs: 1_000
+    },
     retryBaseMs: 1,
     retryMaxMs: 10,
     maxAttempts: 3,

@@ -2,12 +2,13 @@
 
 为 Windows 上的 Codex Desktop 与 Codex CLI 提供本地、持久化的任务结束和 API 故障通知桥接。
 
-当前版本默认使用 `dry-run` adapter：所有事件会进入本地 outbox，并写入本地 dry-run 交付记录；不会调用微信或 OpenClaw。
+当前版本默认使用 `dry-run` adapter：所有事件会进入本地 outbox，并写入本地 dry-run 交付记录；不会调用微信或 OpenClaw。真实 OpenClaw adapter 已按本机实发契约实现，但只有在安全环境变量提供 account/target 后才会启用。
 
 ## 当前边界
 
 - 已实现：本地服务、持久 outbox、透明 API 代理、CLI JSONL 事件解析、Codex Stop hook、会话 JSONL 兼容性观察器。
-- 待接入：真实 OpenClaw 微信发送协议、目标会话/联系人、凭据安全存储和生产配置切换。
+- 已验证：OpenClaw 微信 CLI 发送契约及一次真实收件确认；详见 [发送契约](docs/verified-openclaw-contract.md)。
+- 待验收：生产 watcher 启动、Desktop/CLI 正常与异常终态、离线恢复重试。
 - 未修改：现有 `C:\Users\TheMapleBin\.codex\config.toml` 与 CC Switch 的运行端口。
 
 详见 [实施计划](docs/implementation-plan.md) 与 [Codex 接入说明](docs/codex-setup.md)。

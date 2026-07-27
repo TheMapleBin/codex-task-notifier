@@ -31,6 +31,14 @@ function booleanFromEnv(value, fallback) {
   throw new Error(`Expected a boolean value, received ${value}.`);
 }
 
+function secureValueFromEnv(value, name, { required = false } = {}) {
+  if (value == null || value === "") {
+    if (required) throw new Error(`${name} is required when CODEX_NOTIFY_ADAPTER=openclaw.`);
+    return null;
+  }
+  return value;
+}
+
 export function isLoopbackHost(hostname) {
   const normalized = hostname.toLowerCase();
   return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
@@ -92,6 +100,17 @@ export function loadConfig(env = process.env) {
       name: "CODEX_NOTIFY_UPSTREAM_TIMEOUT_MS"
     }),
     adapter,
+    openclaw: Object.freeze({
+      command: env.CODEX_NOTIFY_OPENCLAW_COMMAND || "openclaw",
+      channel: "openclaw-weixin",
+      account: secureValueFromEnv(env.CODEX_NOTIFY_OPENCLAW_ACCOUNT, "CODEX_NOTIFY_OPENCLAW_ACCOUNT", { required: adapter === "openclaw" }),
+      target: secureValueFromEnv(env.CODEX_NOTIFY_OPENCLAW_TARGET, "CODEX_NOTIFY_OPENCLAW_TARGET", { required: adapter === "openclaw" }),
+      timeoutMs: integerFromEnv(env.CODEX_NOTIFY_OPENCLAW_TIMEOUT_MS, 30_000, {
+        min: 1_000,
+        max: 300_000,
+        name: "CODEX_NOTIFY_OPENCLAW_TIMEOUT_MS"
+      })
+    }),
     retryBaseMs,
     retryMaxMs: integerFromEnv(env.CODEX_NOTIFY_RETRY_MAX_MS, 1_800_000, {
       min: retryBaseMs,

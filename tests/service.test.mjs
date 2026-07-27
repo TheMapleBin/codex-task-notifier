@@ -28,3 +28,20 @@ test("notification service accepts loopback events and dispatches them", async (
     await service.close();
   }
 });
+
+test("notification worker dispatches direct watcher events without an HTTP listener", async () => {
+  const home = await temporaryDirectory();
+  const delivered = [];
+  const service = createNotifierService(testConfig(home), {
+    adapter: { name: "capture", send: async (event) => delivered.push(event) }
+  });
+  await service.start({ listen: false });
+  try {
+    await service.submit({ source: "session-watcher", kind: "turn_finished", turnId: "turn-direct", durationMs: 1_000 });
+    await service.tick();
+    assert.equal(delivered.length, 1);
+    assert.equal(delivered[0].turnId, "turn-direct");
+  } finally {
+    await service.close();
+  }
+});

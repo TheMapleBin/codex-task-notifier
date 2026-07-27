@@ -75,11 +75,12 @@ export function createNotifierService(config, { adapter = selectAdapter(config),
     }
   }
 
-  async function start() {
+  async function start({ listen = true } = {}) {
     await outbox.init();
     await outbox.importIncoming();
 
-    server = http.createServer(async (request, response) => {
+    if (listen) {
+      server = http.createServer(async (request, response) => {
       if (!isLoopbackRemote(request.socket.remoteAddress)) {
         sendJson(response, 403, { error: "loopback only" });
         return;
@@ -99,12 +100,13 @@ export function createNotifierService(config, { adapter = selectAdapter(config),
       } catch (error) {
         sendJson(response, error.statusCode || 400, { error: "invalid event" });
       }
-    });
+      });
 
-    await new Promise((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(config.servicePort, config.serviceHost, resolve);
-    });
+      await new Promise((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(config.servicePort, config.serviceHost, resolve);
+      });
+    }
     timer = setInterval(tick, config.pollIntervalMs);
     timer.unref();
     await tick();

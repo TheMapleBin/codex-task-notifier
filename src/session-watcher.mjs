@@ -20,13 +20,19 @@ async function findRolloutFiles(directory) {
 }
 
 function parseHttpStatus(error) {
-  const message = typeof error?.message === "string" ? error.message : "";
+  const message = typeof error === "string" ? error : typeof error?.message === "string" ? error.message : "";
   const matched = /\b([45]\d{2})\b/.exec(message);
   return matched ? Number(matched[1]) : null;
 }
 
-function errorCode(error) {
-  return String(error?.codex_error_info || error?.code || "CODEX_TASK_ERROR").slice(0, 120);
+function errorKind(error, httpStatus) {
+  if (httpStatus) return "http_status";
+  const category = String(error?.codex_error_info || error?.code || "").toLowerCase();
+  if (["connection_failed", "timeout", "stream_error", "exit_code"].includes(category)) return category;
+  const message = typeof error === "string" ? error : typeof error?.message === "string" ? error.message : "";
+  if (/timeout/i.test(message)) return "timeout";
+  if (/(connection|network)/i.test(message)) return "connection_failed";
+  return "unknown";
 }
 
 function terminalEvent(record, state) {
@@ -35,10 +41,11 @@ function terminalEvent(record, state) {
   const turnId = payload.turn_id || payload.turnId || null;
   const common = {
     source: "session-watcher",
-    occurredAt: record.timestamp || new Date().toISOString(),
+    occurredAt: payload.completed_at || record.timestamp || new Date().toISOString(),
     workspace: state.workspace,
     surface: "unknown",
     turnId,
+    durationMs: payload.duration_ms,
     correlationKey: turnId ? `turn:${turnId}` : null
   };
   if (payload.type === "task_complete") {
@@ -49,8 +56,7 @@ function terminalEvent(record, state) {
         kind: "task_error",
         severity: "error",
         httpStatus: status,
-        errorKind: status ? "http_status" : "unknown",
-        errorCode: errorCode(payload.error)
+        errorKind: errorKind(payload.error, status)
       };
     }
     return { ...common, kind: "turn_finished" };
@@ -60,8 +66,7 @@ function terminalEvent(record, state) {
       ...common,
       kind: "turn_interrupted",
       severity: "warning",
-      errorKind: "unknown",
-      errorCode: String(payload.reason || "INTERRUPTED").slice(0, 120)
+      errorKind: "unknown"
     };
   }
   return null;
@@ -71,6 +76,30 @@ export function createSessionWatcher({ sessionsDir, onEvent, pollIntervalMs = 1_
   const states = new Map();
   let timer = null;
   let scanning = false;
+
+  function updateContext(record, state) {
+    if (record.type !== "turn_context") return;
+    state.workspace = record.payload?.cwd || state.workspace;
+    state.subagent ||= Boolean(record.payload?.parent_thread_id || record.payload?.agent_path);
+  }
+
+  async function primeExisting() {
+    for (const filePath of await findRolloutFiles(sessionsDir)) {
+      const content = await fs.readFile(filePath);
+      const state = { offset: content.length, pending: "", emitted: new Set(), workspace: null, subagent: false };
+      const lines = content.toString("utf8").split("\n");
+      state.pending = lines.pop() || "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          updateContext(JSON.parse(line), state);
+        } catch {
+          // Keep the last valid context and wait for later complete records.
+        }
+      }
+      states.set(filePath, state);
+    }
+  }
 
   async function scanOnce() {
     if (scanning) return 0;
@@ -102,10 +131,7 @@ export function createSessionWatcher({ sessionsDir, onEvent, pollIntervalMs = 1_
           } catch {
             continue;
           }
-          if (record.type === "turn_context") {
-            state.workspace = record.payload?.cwd || state.workspace;
-            state.subagent ||= Boolean(record.payload?.parent_thread_id || record.payload?.agent_path);
-          }
+          updateContext(record, state);
           if (excludeSubagents && state.subagent) continue;
           const eventInput = terminalEvent(record, state);
           if (!eventInput) continue;
@@ -123,13 +149,14 @@ export function createSessionWatcher({ sessionsDir, onEvent, pollIntervalMs = 1_
     return emitted;
   }
 
-  function start() {
-    if (timer) return;
+  async function start() {
+    if (timer) return 0;
+    await primeExisting();
     timer = setInterval(() => {
       scanOnce().catch((error) => process.stderr.write(`[codex-notify] session watcher: ${String(error.message || error)}\n`));
     }, pollIntervalMs);
     timer.unref();
-    return scanOnce();
+    return 0;
   }
 
   function close() {
