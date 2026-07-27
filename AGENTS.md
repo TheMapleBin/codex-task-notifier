@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **codex-openclaw-notifier** (232 symbols, 546 relationships, 20 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **codex-openclaw-notifier** (250 symbols, 618 relationships, 20 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -40,15 +40,5 @@ This project is indexed by GitNexus as **codex-openclaw-notifier** (232 symbols,
 | Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
 | Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
-| Work in the Cluster_9 area (11 symbols) | `.claude/skills/generated/cluster-9/SKILL.md` |
-| Work in the Cluster_4 area (9 symbols) | `.claude/skills/generated/cluster-4/SKILL.md` |
-| Work in the Tests area (7 symbols) | `.claude/skills/generated/tests/SKILL.md` |
-| Work in the Cluster_2 area (7 symbols) | `.claude/skills/generated/cluster-2/SKILL.md` |
-| Work in the Cluster_3 area (7 symbols) | `.claude/skills/generated/cluster-3/SKILL.md` |
-| Work in the Cluster_6 area (7 symbols) | `.claude/skills/generated/cluster-6/SKILL.md` |
-| Work in the Cluster_7 area (7 symbols) | `.claude/skills/generated/cluster-7/SKILL.md` |
-| Work in the Cluster_8 area (7 symbols) | `.claude/skills/generated/cluster-8/SKILL.md` |
-| Work in the Cluster_5 area (6 symbols) | `.claude/skills/generated/cluster-5/SKILL.md` |
-| Work in the Cluster_11 area (6 symbols) | `.claude/skills/generated/cluster-11/SKILL.md` |
 
 <!-- gitnexus:end -->
