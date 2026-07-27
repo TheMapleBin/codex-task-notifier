@@ -15,7 +15,13 @@ function executeOpenClaw(command, args, { timeoutMs, spawnImpl = spawn } = {}) {
 
     let child;
     try {
-      child = spawnImpl(command, args, { stdio: "ignore", windowsHide: true });
+      // On Windows, npm-installed CLI wrappers are .cmd files and require a
+      // shell to execute. Pass shell:true only on Windows so Unix behaviour
+      // is unchanged. Args are still array-based; Node handles the escaping.
+      const spawnOpts = process.platform === "win32"
+        ? { stdio: "ignore", windowsHide: true, shell: true }
+        : { stdio: "ignore", windowsHide: true };
+      child = spawnImpl(command, args, spawnOpts);
     } catch {
       settle({ started: false, exitCode: null, timedOut: false });
       return;
