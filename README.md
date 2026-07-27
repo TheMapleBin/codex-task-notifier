@@ -8,11 +8,12 @@
 
 - 已实现并经自动化测试：进程外会话 JSONL watcher、持久 outbox、OpenClaw CLI adapter，以及可选 CLI wrapper。
 - 已完成真实运输验证：一次 `openclaw message send` 成功退出，且收件人已确认微信实际收到。详见 [发送契约](docs/verified-openclaw-contract.md)。
-- 尚未完成现场验收：Desktop 正常/API 错误、CLI 正常/非零或 API 错误、用户中断和通道离线恢复重试。
+- 已完成一项端到端现场验收：新建 CLI 任务正常完成后，watcher 捕获终态、outbox 成功投递，收件人在微信端按验收请求回复。详见 [现场验收记录](docs/live-acceptance.md)。
+- 尚未完成现场验收：Desktop 正常/API 错误、CLI 非零或 API 错误、用户中断和通道离线恢复重试。
 - 未启用：Stop hook、CLI wrapper、API proxy、`15722` 代理和任何新的计划任务或服务。
 - 未修改：`C:\Users\TheMapleBin\.codex\config.toml`、现有 OpenClaw Gateway、既有 Gateway 计划任务，以及两个既有微信 channel 配置。
 
-接手任务前必须阅读：[实施计划](docs/implementation-plan.md)、[代理交接](docs/claude-handoff.md)、[受控接入说明](docs/codex-setup.md) 和 [发送契约](docs/verified-openclaw-contract.md)。这些文档以阶段门禁为准，不能用自动化测试、端口监听、channel 状态或 dry-run 替代微信实际送达。
+接手任务前必须阅读：[实施计划](docs/implementation-plan.md)、[代理交接](docs/claude-handoff.md)、[现场验收记录](docs/live-acceptance.md)、[受控接入说明](docs/codex-setup.md) 和 [发送契约](docs/verified-openclaw-contract.md)。这些文档以阶段门禁为准，不能用自动化测试、端口监听、channel 状态或 dry-run 替代微信实际送达。
 
 ## 本地开发
 

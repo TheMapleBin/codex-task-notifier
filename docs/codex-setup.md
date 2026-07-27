@@ -64,4 +64,4 @@ Codex rollout JSONL
 
 每次现场测试用不含敏感值的记录分成四列：事件已捕获、已入 outbox、发送命令成功、微信实际收到。没有最后一列的测试只能称为本机链路验证，不能称为微信通知验收。
 
-有关当前阻塞、提交基线和接手步骤，阅读 [Codex / Claude 交接](claude-handoff.md)。
+有关当前阻塞、提交基线和接手步骤，阅读 [Codex / Claude 交接](claude-handoff.md)。已通过的 CLI 正常完成用例见 [现场验收记录](live-acceptance.md)；不得把该单项结果扩展为生产接入已完成。

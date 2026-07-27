@@ -20,9 +20,9 @@
 | --- | --- | --- | --- | --- |
 | 1. 发送路径调查 | 只读核对 Codeg、OpenClaw CLI、Gateway、channel 与目标发现方式 | 完成，选择既有 OpenClaw CLI | 插件已加载；当前运行账号有 `send` 能力；`openclaw message send` 提供 channel/account/target/message/json 和退出码契约 | 选择路径后才可做一次手工实发 |
 | 2. 最小真实微信实发 | 通过实际入站元数据确定 target，手工发送一条净化测试通知 | 完成 | 命令退出码为 0，收件人已确认微信实际收到 | 记录无敏感发送契约 |
-| 3. 最小外部 watcher | 只实现 JSONL watcher、持久 outbox 和真实 adapter；默认排除子代理并去重 | 实现与软件验证完成，未部署 | `bf98bec`；adapter、watcher、outbox 的 24 项自动化测试通过 | 需要真实 Codex 终态的四层证据 |
+| 3. 最小外部 watcher | 只实现 JSONL watcher、持久 outbox 和真实 adapter；默认排除子代理并去重 | 实现与软件验证完成，未部署 | `bf98bec`、`6edcbea`、`a24bef4`；26 项自动化测试通过；Windows adapter 不经过 shell | 需要真实 Codex 终态的四层证据 |
 | 4. CLI 精确退出码 | 仅验证 `codex exec` 自动化 wrapper 的 stdout/stderr 与退出码 | 实现与软件验证完成，未部署 | `ced6bdc`；wrapper 测试覆盖 stderr 透传、非零退出和中断 | 仅在 watcher 无法给出精确退出码时使用 |
-| 5. 判断 API 代理是否必要 | 用真实 Desktop 和 CLI 的可控 API 失败验证 watcher/wrapper | 阻塞 | 尚无不改 Desktop 配置、认证或网络即可安全注入的 Desktop API 失败 | 每个用例完成四层证据，且用户确认微信收到 |
+| 5. 判断 API 代理是否必要 | 用真实 Desktop 和 CLI 的可控任务与 API 失败验证 watcher/wrapper | 进行中 | CLI 正常完成已通过四层验收；仍无不改 Desktop 配置、认证或网络即可安全注入的 Desktop API 失败 | 完成其余用例的四层证据 |
 | 6. 生产接入 | 启动一个 watcher，并完成全套现场验收 | 未开始 | 无 | 阶段 5 全部通过且用户明确允许 |
 
 ## 已验证发送契约
@@ -63,7 +63,7 @@ openclaw message send \
 | --- | --- | --- |
 | Desktop 正常完成 | `turn_finished` 被捕获并送达 | 未验收 |
 | Desktop API 错误 | 错误类别或 HTTP 状态被净化后送达 | 阻塞：缺少安全可控的失败触发方式 |
-| CLI 正常完成 | watcher 捕获终态并送达 | 未验收 |
+| CLI 正常完成 | watcher 捕获终态并送达 | 已验收：2026-07-28，见 [现场验收记录](live-acceptance.md) |
 | CLI 非零或 API 错误 | watcher 或按需 wrapper 捕获并送达 | 未验收 |
 | 用户中断 | `turn_aborted` 或精确 CLI 中断被捕获并送达 | 未验收 |
 | 微信暂时离线后恢复 | pending outbox 重试并最终送达 | 未验收 |
@@ -78,6 +78,6 @@ openclaw message send \
 
 ## 验证与提交规则
 
-当前软件验证为 `npm run check` 与 `npm test`，后者在运行时基线 `ced6bdc` 上为 24/24 通过。它不构成阶段 5 或 6 现场验收。
+当前软件验证为 `npm run check` 与 `npm test`，后者在 `a24bef4` 上为 26/26 通过。只有 [现场验收记录](live-acceptance.md) 中逐层留证的用例才构成阶段 5 证据；自动化测试本身不构成阶段 5 或 6 现场验收。
 
 所有后续修改必须保留脏工作树、检查 `git status --short` 与相关 diff、只暂存本任务文件、运行 GitNexus `detect_changes`，本地提交且不 push。完整交接状态见 [Codex / Claude 交接](claude-handoff.md)。

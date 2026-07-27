@@ -2,7 +2,7 @@
 
 ## 接手前结论
 
-当前仓库已完成真实微信运输验证，但尚未完成生产 Codex 端到端验收。下一位代理的默认动作是保留现状、阅读本文件和 [实施计划](implementation-plan.md)，而不是启动服务或改写系统配置。
+当前仓库已完成真实微信运输验证，并完成一项“新建 CLI 任务正常结束”的四层端到端验收，但尚未完成全部生产验收。下一位代理的默认动作是保留现状、阅读本文件、[实施计划](implementation-plan.md) 和 [现场验收记录](live-acceptance.md)，而不是启动服务或改写系统配置。
 
 运行时基线提交如下：
 
@@ -12,6 +12,9 @@
 | `bf98bec` | OpenClaw watcher 通知与真实 adapter | 软件实现完成 |
 | `d2d20a9` | 刷新 GitNexus 索引元数据 | 索引与运行时代码对齐 |
 | `ced6bdc` | CLI wrapper stderr 透传测试 | `npm run check` 与 `npm test` 通过，24/24 |
+| `6edcbea` | 保持无 HTTP listener 的 watcher 进程存活 | 回归测试通过 |
+| `a24bef4` | 通过 PowerShell shim 安全执行 Windows OpenClaw | 26/26；本机真实命令退出码为 0 |
+| `071b203` | 刷新 GitNexus 生成文档 | 索引生成文件对齐 |
 
 ## 阶段门禁
 
@@ -52,9 +55,9 @@ flowchart TB
 | 标签 | 当前已知事实 | 不能推出的结论 |
 | --- | --- | --- |
 | 实现完成 | watcher、outbox、OpenClaw adapter、可选 wrapper 都在代码中 | 不代表已运行或已向微信送达 |
-| 软件验证 | `npm run check` 和 `npm test` 均通过，测试数为 24 | 不代表真实 Codex 或微信现场行为 |
+| 软件验证 | `npm run check` 和 `npm test` 均通过，测试数为 26 | 不代表真实 Codex 或微信现场行为 |
 | 运输验证 | 一次真实 `openclaw message send` 成功退出，且收件人确认微信实际收到 | 不代表 Codex 终态被捕获 |
-| 现场验收 | 目前没有完整用例通过四层证据 | 不得声称生产通知已上线 |
+| 现场验收 | CLI 正常完成用例已通过四层证据 | 只证明该用例，不代表全部生产验收完成 |
 
 已验证的 transport contract 只记录在 [发送契约](verified-openclaw-contract.md)。该契约的 account 和完整 target 从安全环境变量读取；绝不读取或把值写入代码、文档、Git、日志或聊天。
 
@@ -72,12 +75,14 @@ Codeg 仅提供 iLink 轮询相关迹象，未得到可安全复用的公开发�
 | --- | --- | --- | --- | --- | --- |
 | Desktop 正常完成 | 必需 | 必需 | 必需 | 必需 | 未验收 |
 | Desktop API 错误 | 必需 | 必需 | 必需 | 必需 | 阻塞 |
-| CLI 正常完成 | 必需 | 必需 | 必需 | 必需 | 未验收 |
+| CLI 正常完成 | 已证明 | 已证明 | 已证明 | 已证明 | 通过：2026-07-28 |
 | CLI 非零/API 错误 | 必需 | 必需 | 必需 | 必需 | 未验收 |
 | 用户中断 | 必需 | 必需 | 必需 | 必需 | 未验收 |
 | 微信离线后恢复 | 必需 | 必需 | 必需 | 必需 | 未验收 |
 
 `dry-run`、测试绿灯、Gateway 可达、端口监听、channel configured/enabled 或只有发送命令退出码 0，均不能填补“微信实际收到”列。
+
+CLI 正常完成用例的无敏感证据、时间和验证目录边界记录在 [现场验收记录](live-acceptance.md)。该用例使用临时 watcher，验收结束后已停止；没有注册服务、计划任务或修改 Codex 配置。
 
 ## 禁止事项
 
