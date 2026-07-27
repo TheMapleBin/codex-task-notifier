@@ -51,18 +51,19 @@ test("CLI wrapper lets a nonzero child exit override a stale completed JSONL rec
   const stderr = captureStream();
   const calls = [];
   const output = '{"type":"thread.started","thread_id":"thread-demo"}\n{"type":"turn.completed"}\n';
+  const errorOutput = "codex stderr passthrough\n";
   try {
     const result = await runCodexExec(["implement something"], {
       config,
       cwd: "D:\\work\\demo",
       stdout: stdout.stream,
       stderr: stderr.stream,
-      spawnImpl: syntheticSpawn({ output, code: 47 }, calls)
+      spawnImpl: syntheticSpawn({ output, errorOutput, code: 47 }, calls)
     });
     await service.tick();
     assert.equal(result.code, 47);
     assert.equal(stdout.text(), output);
-    assert.equal(stderr.text(), "");
+    assert.equal(stderr.text(), errorOutput);
     assert.deepEqual(calls[0].args, ["exec", "--json", "implement something"]);
     assert.equal(calls[0].options.env.CODEX_NOTIFY_CLI_WRAPPER, "1");
     assert.equal(delivered.length, 1);
