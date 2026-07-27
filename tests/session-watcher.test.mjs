@@ -37,6 +37,49 @@ test("session watcher turns a persisted API failure into a sanitized task error"
   assert.equal(await watcher.scanOnce(), 0);
 });
 
+test("session watcher carries only the latest assistant output for the current turn", async () => {
+  const root = await temporaryDirectory();
+  const directory = path.join(root, "2026", "07", "28");
+  await fs.mkdir(directory, { recursive: true });
+  const rollout = path.join(directory, "rollout-output.jsonl");
+  const lines = [
+    JSON.stringify({ type: "event_msg", payload: { type: "task_started", turn_id: "turn-output" } }),
+    JSON.stringify({ type: "turn_context", payload: { cwd: "C:\\work\\demo", turn_id: "turn-output" } }),
+    JSON.stringify({ type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "private prompt" }] } }),
+    JSON.stringify({ type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "draft output" }] } }),
+    JSON.stringify({ type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "final line one" }, { type: "output_text", text: "final line two" }] } }),
+    JSON.stringify({ type: "event_msg", payload: { type: "task_complete", turn_id: "turn-output", duration_ms: 2_000 } })
+  ];
+  await fs.writeFile(rollout, `${lines.join("\n")}\n`, "utf8");
+  const events = [];
+  const watcher = createSessionWatcher({ sessionsDir: root, onEvent: async (event) => events.push(event) });
+
+  assert.equal(await watcher.scanOnce(), 1);
+  assert.equal(events[0].finalOutput, "final line one\nfinal line two");
+  assert.doesNotMatch(events[0].finalOutput, /private prompt|draft output/);
+});
+
+test("session watcher does not reuse assistant output across turns", async () => {
+  const root = await temporaryDirectory();
+  const directory = path.join(root, "2026", "07", "28");
+  await fs.mkdir(directory, { recursive: true });
+  const rollout = path.join(directory, "rollout-two-turns.jsonl");
+  const lines = [
+    JSON.stringify({ type: "event_msg", payload: { type: "task_started", turn_id: "turn-one" } }),
+    JSON.stringify({ type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "first output" }] } }),
+    JSON.stringify({ type: "event_msg", payload: { type: "task_complete", turn_id: "turn-one" } }),
+    JSON.stringify({ type: "event_msg", payload: { type: "task_started", turn_id: "turn-two" } }),
+    JSON.stringify({ type: "event_msg", payload: { type: "task_complete", turn_id: "turn-two", error: "request failed with 503" } })
+  ];
+  await fs.writeFile(rollout, `${lines.join("\n")}\n`, "utf8");
+  const events = [];
+  const watcher = createSessionWatcher({ sessionsDir: root, onEvent: async (event) => events.push(event) });
+
+  assert.equal(await watcher.scanOnce(), 2);
+  assert.equal(events[0].finalOutput, "first output");
+  assert.equal(events[1].finalOutput, null);
+});
+
 test("session watcher records an interrupted root task without prompt content", async () => {
   const root = await temporaryDirectory();
   const directory = path.join(root, "2026", "07", "27");

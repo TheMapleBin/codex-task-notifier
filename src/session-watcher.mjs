@@ -35,6 +35,16 @@ function errorKind(error, httpStatus) {
   return "unknown";
 }
 
+function assistantOutput(record) {
+  const payload = record?.type === "response_item" ? record.payload : null;
+  if (payload?.type !== "message" || payload.role !== "assistant" || !Array.isArray(payload.content)) return null;
+  const parts = payload.content
+    .filter((item) => item?.type === "output_text" && typeof item.text === "string")
+    .map((item) => item.text)
+    .filter((text) => text.trim());
+  return parts.length ? parts.join("\n") : null;
+}
+
 function terminalEvent(record, state) {
   if (record?.type !== "event_msg" || !record.payload) return null;
   const payload = record.payload;
@@ -46,7 +56,8 @@ function terminalEvent(record, state) {
     surface: "unknown",
     turnId,
     durationMs: payload.duration_ms,
-    correlationKey: turnId ? `turn:${turnId}` : null
+    correlationKey: turnId ? `turn:${turnId}` : null,
+    finalOutput: !turnId || state.turnId === turnId ? state.lastAssistantOutput : null
   };
   if (payload.type === "task_complete") {
     if (payload.error) {
@@ -78,15 +89,39 @@ export function createSessionWatcher({ sessionsDir, onEvent, pollIntervalMs = 1_
   let scanning = false;
 
   function updateContext(record, state) {
-    if (record.type !== "turn_context") return;
-    state.workspace = record.payload?.cwd || state.workspace;
-    state.subagent ||= Boolean(record.payload?.parent_thread_id || record.payload?.agent_path);
+    const startedTurnId = record.type === "event_msg" && record.payload?.type === "task_started"
+      ? record.payload?.turn_id || record.payload?.turnId
+      : record.type === "turn_context"
+        ? record.payload?.turn_id || record.payload?.turnId
+        : null;
+    if (startedTurnId && startedTurnId !== state.turnId) {
+      state.turnId = startedTurnId;
+      state.lastAssistantOutput = null;
+    }
+    if (record.type === "turn_context") {
+      state.workspace = record.payload?.cwd || state.workspace;
+      state.subagent ||= Boolean(record.payload?.parent_thread_id || record.payload?.agent_path);
+    }
+    const output = assistantOutput(record);
+    if (output) state.lastAssistantOutput = output;
+  }
+
+  function initialState(offset = 0) {
+    return {
+      offset,
+      pending: "",
+      emitted: new Set(),
+      workspace: null,
+      subagent: false,
+      turnId: null,
+      lastAssistantOutput: null
+    };
   }
 
   async function primeExisting() {
     for (const filePath of await findRolloutFiles(sessionsDir)) {
       const content = await fs.readFile(filePath);
-      const state = { offset: content.length, pending: "", emitted: new Set(), workspace: null, subagent: false };
+      const state = initialState(content.length);
       const lines = content.toString("utf8").split("\n");
       state.pending = lines.pop() || "";
       for (const line of lines) {
@@ -108,11 +143,15 @@ export function createSessionWatcher({ sessionsDir, onEvent, pollIntervalMs = 1_
     try {
       for (const filePath of await findRolloutFiles(sessionsDir)) {
         const stat = await fs.stat(filePath);
-        const state = states.get(filePath) || { offset: 0, pending: "", emitted: new Set(), workspace: null, subagent: false };
+        const state = states.get(filePath) || initialState();
         if (stat.size < state.offset) {
           state.offset = 0;
           state.pending = "";
           state.emitted.clear();
+          state.workspace = null;
+          state.subagent = false;
+          state.turnId = null;
+          state.lastAssistantOutput = null;
         }
         if (stat.size === state.offset) {
           states.set(filePath, state);

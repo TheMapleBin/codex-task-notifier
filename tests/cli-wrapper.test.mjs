@@ -50,7 +50,7 @@ test("CLI wrapper lets a nonzero child exit override a stale completed JSONL rec
   const stdout = captureStream();
   const stderr = captureStream();
   const calls = [];
-  const output = '{"type":"thread.started","thread_id":"thread-demo"}\n{"type":"turn.completed"}\n';
+  const output = '{"type":"thread.started","thread_id":"thread-demo"}\n{"type":"item.completed","item":{"id":"item-1","type":"agent_message","text":"final output\\nsecond line"}}\n{"type":"turn.completed"}\n';
   const errorOutput = "codex stderr passthrough\n";
   try {
     const result = await runCodexExec(["implement something"], {
@@ -71,6 +71,7 @@ test("CLI wrapper lets a nonzero child exit override a stale completed JSONL rec
     assert.equal(delivered[0].errorKind, "exit_code");
     assert.equal(delivered[0].errorCode, "EXIT_47");
     assert.equal(delivered[0].workspace, "demo");
+    assert.equal(delivered[0].finalOutput, "final output\nsecond line");
   } finally {
     await service.close();
   }

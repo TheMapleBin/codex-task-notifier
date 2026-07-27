@@ -48,6 +48,19 @@ function terminalFromRecord(record, state) {
     state.threadId = String(record.thread_id);
     return;
   }
+  if (record.type === "item.completed" && record.item?.type === "agent_message") {
+    const text = typeof record.item.text === "string"
+      ? record.item.text
+      : Array.isArray(record.item.content)
+        ? record.item.content
+          .filter((item) => item?.type === "output_text" && typeof item.text === "string")
+          .map((item) => item.text)
+          .filter((item) => item.trim())
+          .join("\n")
+        : null;
+    if (text?.trim()) state.finalOutput = text;
+    return;
+  }
   if (record.type === "turn.completed") {
     state.terminal = { kind: "turn_finished", errorKind: null, errorCode: null };
     return;
@@ -94,7 +107,7 @@ export async function runCodexExec(args, {
   cwd = process.cwd(),
   env = process.env
 } = {}) {
-  const state = { threadId: null, terminal: null };
+  const state = { threadId: null, terminal: null, finalOutput: null };
   const child = spawnImpl(env.CODEX_BIN || "codex", ["exec", ...normalizedExecArgs(args)], {
     cwd,
     env: { ...env, CODEX_NOTIFY_CLI_WRAPPER: "1" },
@@ -124,7 +137,8 @@ export async function runCodexExec(args, {
       turnId: state.threadId,
       correlationKey: state.threadId ? `cli:${state.threadId}` : null,
       errorKind: terminal.errorKind,
-      errorCode: terminal.errorCode
+      errorCode: terminal.errorCode,
+      finalOutput: state.finalOutput
     });
   } catch (error) {
     // Notification capture is intentionally fail-open: it must not rewrite the

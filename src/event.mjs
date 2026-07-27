@@ -28,6 +28,8 @@ const DEFAULT_SEVERITY = {
   delivery_error: "warning"
 };
 
+export const FINAL_OUTPUT_MAX_LENGTH = 1_200;
+
 function cleanText(value, maxLength) {
   if (value == null) {
     return null;
@@ -37,6 +39,31 @@ function cleanText(value, maxLength) {
     .replace(/[\x00-\x1F\x7F]/g, "")
     .trim();
   return normalized ? normalized.slice(0, maxLength) : null;
+}
+
+function redactSensitiveText(value) {
+  return value
+    .replace(/\b(authorization|cookie)(\s*:\s*)[^\n]*/gi, "$1$2[REDACTED]")
+    .replace(/\b(Bearer)\s+[A-Za-z0-9._~+\/-]+=*/gi, "$1 [REDACTED]")
+    .replace(/\b(sk-[A-Za-z0-9_-]{10,})\b/g, "[REDACTED]")
+    .replace(/\b(eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,})\b/g, "[REDACTED]")
+    .replace(
+      /(\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|context[_-]?token|token|password|secret)\b\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s,;\n]+)/gi,
+      "$1[REDACTED]"
+    );
+}
+
+function safeFinalOutput(value) {
+  if (value == null) return null;
+  const normalized = redactSensitiveText(String(value)
+    .replace(/\r\n?/g, "\n")
+    .replace(/\t/g, "  ")
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ""))
+    .trim();
+  if (!normalized) return null;
+  const characters = Array.from(normalized);
+  if (characters.length <= FINAL_OUTPUT_MAX_LENGTH) return normalized;
+  return `${characters.slice(0, FINAL_OUTPUT_MAX_LENGTH - 3).join("")}...`;
 }
 
 function asIsoTimestamp(value) {
@@ -154,7 +181,8 @@ export function createEvent(input) {
     httpStatus,
     errorKind,
     errorCode: safeErrorCode(input.errorCode),
-    durationMs: durationMs(input.durationMs)
+    durationMs: durationMs(input.durationMs),
+    finalOutput: safeFinalOutput(input.finalOutput)
   });
 }
 
@@ -178,6 +206,7 @@ export function formatEventForDelivery(event) {
   if (event.turnId) lines.push(`任务: ${event.turnId.slice(-12)}`);
   if (event.httpStatus) lines.push(`HTTP: ${event.httpStatus}`);
   if (event.errorKind) lines.push(`错误类型: ${event.errorKind}`);
+  if (event.finalOutput) lines.push("输出:", event.finalOutput);
   return lines.join("\n");
 }
 
