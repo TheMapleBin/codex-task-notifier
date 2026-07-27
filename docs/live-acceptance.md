@@ -12,8 +12,8 @@
 
 | 证据层 | 现场结果 |
 | --- | --- |
-| 新任务 | 通过 `codex exec --json` 创建独立任务，进程退出码为 `0` |
-| 事件捕获 | `session-watcher` 捕获 `turn_finished`；项目为 `codex-openclaw-notifier`；短任务 ID 为 `e3a9b8f8369c`；耗时 `10293 ms` |
+| 新任务 | 通过 `codex exec --json` 创建独立任务，进程退出码为 `0`；CLI thread 短 ID 为 `7194fe20b71c` |
+| 事件捕获 | 该 thread 对应唯一 rollout；其中 `task_complete` 的短 turn ID 为 `e3a9b8f8369c`、耗时 `10293 ms`，与 `session-watcher` 生成的 `turn_finished` 完全一致 |
 | 持久 outbox | 事件写入独立验证目录并进入 `delivered`；发送尝试计数为 `0`；无最后错误类别 |
 | OpenClaw 发送 | Windows adapter 通过 npm PowerShell shim 调用 OpenClaw；命令成功，无 stderr |
 | 微信确认 | 系统发送一条引用短任务 ID 的验收请求；仅当收到任务通知时要求回复。对应 context-token 文件在请求之后出现新的入站更新时间，回复正文未读取 |
