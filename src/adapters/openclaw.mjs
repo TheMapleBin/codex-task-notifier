@@ -1,8 +1,53 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { win32 as windowsPath } from "node:path";
 
 import { formatEventForDelivery } from "../event.mjs";
 
-function executeOpenClaw(command, args, { timeoutMs, spawnImpl = spawn } = {}) {
+function windowsPowerShellShim(command, env, existsSyncImpl) {
+  const extension = windowsPath.extname(command).toLowerCase();
+  if (!["", ".bat", ".cmd", ".ps1"].includes(extension)) return null;
+
+  const base = extension ? command.slice(0, -extension.length) : command;
+  const shimName = `${windowsPath.basename(base)}.ps1`;
+  const candidates = [];
+  if (windowsPath.isAbsolute(command) || /[\\/]/.test(command)) {
+    candidates.push(windowsPath.join(windowsPath.dirname(command), shimName));
+  } else {
+    const pathValue = env.Path || env.PATH || "";
+    for (const entry of pathValue.split(windowsPath.delimiter)) {
+      const directory = entry.trim().replace(/^"|"$/g, "");
+      if (directory) candidates.push(windowsPath.join(directory, shimName));
+    }
+  }
+  return candidates.find((candidate) => existsSyncImpl(candidate)) || null;
+}
+
+function resolveInvocation(command, args, { platform, env, existsSyncImpl }) {
+  if (platform !== "win32") return { command, args };
+
+  const extension = windowsPath.extname(command).toLowerCase();
+  const shim = windowsPowerShellShim(command, env, existsSyncImpl);
+  if (shim) {
+    const systemRoot = env.SystemRoot || env.SYSTEMROOT || "C:\\Windows";
+    return {
+      command: windowsPath.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+      args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", shim, ...args]
+    };
+  }
+  if ([".bat", ".cmd", ".ps1"].includes(extension)) {
+    throw new Error("Windows script wrapper has no safe PowerShell shim.");
+  }
+  return { command, args };
+}
+
+export function executeOpenClaw(command, args, {
+  timeoutMs,
+  spawnImpl = spawn,
+  platform = process.platform,
+  env = process.env,
+  existsSyncImpl = existsSync
+} = {}) {
   return new Promise((resolve) => {
     let settled = false;
     let timer = null;
@@ -15,13 +60,8 @@ function executeOpenClaw(command, args, { timeoutMs, spawnImpl = spawn } = {}) {
 
     let child;
     try {
-      // On Windows, npm-installed CLI wrappers are .cmd files and require a
-      // shell to execute. Pass shell:true only on Windows so Unix behaviour
-      // is unchanged. Args are still array-based; Node handles the escaping.
-      const spawnOpts = process.platform === "win32"
-        ? { stdio: "ignore", windowsHide: true, shell: true }
-        : { stdio: "ignore", windowsHide: true };
-      child = spawnImpl(command, args, spawnOpts);
+      const invocation = resolveInvocation(command, args, { platform, env, existsSyncImpl });
+      child = spawnImpl(invocation.command, invocation.args, { stdio: "ignore", windowsHide: true });
     } catch {
       settle({ started: false, exitCode: null, timedOut: false });
       return;

@@ -11,7 +11,7 @@
     "watch": "node src/index.mjs watch",
     "cli": "node src/cli-wrapper.mjs",
     "test": "node --test",
-    "check": "node --check src/index.mjs && node --check src/notifier-service.mjs && node --check src/api-proxy.mjs && node --check src/cli-wrapper.mjs"
+    "check": "node --check src/index.mjs && node --check src/notifier-service.mjs && node --check src/api-proxy.mjs && node --check src/cli-wrapper.mjs && node --check src/adapters/openclaw.mjs"
   },
   "engines": {
     "node": ">=22"

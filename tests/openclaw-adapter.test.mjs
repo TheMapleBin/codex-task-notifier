@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import test from "node:test";
 
-import { createOpenClawAdapter } from "../src/adapters/openclaw.mjs";
+import { createOpenClawAdapter, executeOpenClaw } from "../src/adapters/openclaw.mjs";
 import { createEvent } from "../src/event.mjs";
 import { Outbox } from "../src/outbox.mjs";
 import { temporaryDirectory, testConfig } from "./helpers.mjs";
@@ -19,6 +20,29 @@ function openClawConfig(home, overrides = {}) {
     }
   });
 }
+
+test("Windows OpenClaw execution uses the PowerShell shim without shell interpolation", async () => {
+  const child = new EventEmitter();
+  child.kill = () => {};
+  let captured;
+  const resultPromise = executeOpenClaw("openclaw", ["--message", "literal & value"], {
+    timeoutMs: 1_000,
+    platform: "win32",
+    env: { Path: "C:\\npm", SystemRoot: "C:\\Windows" },
+    existsSyncImpl: (candidate) => candidate === "C:\\npm\\openclaw.ps1",
+    spawnImpl: (command, args, options) => {
+      captured = { command, args, options };
+      queueMicrotask(() => child.emit("exit", 0));
+      return child;
+    }
+  });
+
+  assert.deepEqual(await resultPromise, { started: true, exitCode: 0, timedOut: false });
+  assert.equal(captured.command, "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
+  assert.equal(captured.options.shell, undefined);
+  assert.deepEqual(captured.args.slice(-2), ["--message", "literal & value"]);
+  assert.equal(captured.args[captured.args.indexOf("-File") + 1], "C:\\npm\\openclaw.ps1");
+});
 
 test("OpenClaw adapter uses the verified CLI shape without exposing secure identifiers", async () => {
   const home = await temporaryDirectory();
