@@ -20,7 +20,7 @@ npm test
 - 两个既有微信 channel 配置。
 - `C:\Users\TheMapleBin\.codex\config.toml` 与当前 Codex 网络路由。
 
-不要删除、重新配置、重新登录、重新扫码或重复创建上述对象。不要查看、输出或提交其凭据、完整收件人地址、二维码材料、会话正文、prompt 或请求/响应正文。
+不要删除、重新配置、重新登录、重新扫码或重复创建上述对象。不要查看、输出或提交其凭据、完整收件人地址、二维码材料、用户 prompt、用户消息、完整会话或原始请求/响应正文。
 
 ## 生产候选路径
 
@@ -36,6 +36,8 @@ Codex rollout JSONL
 ```
 
 该 watcher 不会启动本地 HTTP listener。它使用已验证的 OpenClaw CLI 发送契约，account 和完整 target 只能由安全的进程环境注入，变量名为 `CODEX_NOTIFY_OPENCLAW_ACCOUNT` 与 `CODEX_NOTIFY_OPENCLAW_TARGET`。不要把值写进仓库、`config.toml`、脚本、命令历史或聊天内容。
+
+watcher 会从当前根任务的 rollout 中提取最后一条 assistant `output_text`，CLI wrapper 则提取最后一个已完成的 `agent_message`。事件契约在持久化和发送前统一移除控制字符、遮盖明显凭据并截断到 1200 个字符；微信文本仅在结果非空时追加“输出”段。这个机制不提取、不持久化或投递用户消息，也不把原始 API 错误正文当作最终输出。新增输出字段已通过自动化测试，但尚未完成一次新的真实微信显示确认。
 
 生产启动前的最小条件如下：
 

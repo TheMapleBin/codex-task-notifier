@@ -9,7 +9,7 @@
 ## 不可变边界
 
 - 保留现有 OpenClaw 安装、Gateway 计划任务和两个既有微信 channel；禁止删除、重建、重新登录或重复扫码。
-- 不读取、打印、提交或在聊天中索要 account、完整 target、token、cookie、二维码材料、prompt、源码或请求/响应正文。
+- 不读取、打印、提交或在聊天中索要 account、完整 target、token、cookie、二维码材料、用户 prompt、用户消息、源码或原始请求/响应正文。仅允许处理当前任务最后一条 assistant 输出，并且必须先净化和截断。
 - 在阶段 2 的真实微信实发成功之前，不得修改 `C:\Users\TheMapleBin\.codex\config.toml`，不得切换 `base_url`，不得启用 `15722`，不得新增计划任务或服务。
 - 即使阶段 2 已完成，Stop hook、CLI wrapper、API proxy 和 `15722` 仍不是当前生产路径。它们只能按下面的阶段门禁作为可选验证对象。
 - 不把模拟、`dry-run`、channel configured/enabled、端口监听、Gateway 可达或单独的发送退出码当作微信实际送达。
@@ -20,7 +20,7 @@
 | --- | --- | --- | --- | --- |
 | 1. 发送路径调查 | 只读核对 Codeg、OpenClaw CLI、Gateway、channel 与目标发现方式 | 完成，选择既有 OpenClaw CLI | 插件已加载；当前运行账号有 `send` 能力；`openclaw message send` 提供 channel/account/target/message/json 和退出码契约 | 选择路径后才可做一次手工实发 |
 | 2. 最小真实微信实发 | 通过实际入站元数据确定 target，手工发送一条净化测试通知 | 完成 | 命令退出码为 0，收件人已确认微信实际收到 | 记录无敏感发送契约 |
-| 3. 最小外部 watcher | 只实现 JSONL watcher、持久 outbox 和真实 adapter；默认排除子代理并去重 | 实现与软件验证完成，未部署 | `bf98bec`、`6edcbea`、`a24bef4`；26 项自动化测试通过；Windows adapter 不经过 shell | 需要真实 Codex 终态的四层证据 |
+| 3. 最小外部 watcher | 只实现 JSONL watcher、持久 outbox 和真实 adapter；默认排除子代理并去重 | 实现与软件验证完成，未部署 | `bf98bec`、`6edcbea`、`a24bef4`、`373fd3d`；30 项自动化测试通过；Windows adapter 不经过 shell | 需要真实 Codex 终态的四层证据；新增最终输出尚需微信显示验收 |
 | 4. CLI 精确退出码 | 仅验证 `codex exec` 自动化 wrapper 的 stdout/stderr 与退出码 | 实现与软件验证完成，未部署 | `ced6bdc`；wrapper 测试覆盖 stderr 透传、非零退出和中断 | 仅在 watcher 无法给出精确退出码时使用 |
 | 5. 判断 API 代理是否必要 | 用真实 Desktop 和 CLI 的可控任务与 API 失败验证 watcher/wrapper | 进行中 | CLI 正常完成已通过四层验收；仍无不改 Desktop 配置、认证或网络即可安全注入的 Desktop API 失败 | 完成其余用例的四层证据 |
 | 6. 生产接入 | 启动一个 watcher，并完成全套现场验收 | 未开始 | 无 | 阶段 5 全部通过且用户明确允许 |
@@ -48,7 +48,7 @@ openclaw message send \
 2. 持久 outbox：先落盘、去重、重试；发送失败或超时不会阻塞 Codex。
 3. OpenClaw adapter：仅从 `CODEX_NOTIFY_OPENCLAW_ACCOUNT` 与 `CODEX_NOTIFY_OPENCLAW_TARGET` 取得敏感定位值，且丢弃子进程 stdout/stderr。
 
-通知内容严格限于来源、项目名、状态、耗时、短任务 ID、净化后的错误类别和 HTTP 状态。不得扩展为包含 prompt、文件内容、源码、认证字段或原始错误正文。
+通知内容严格限于来源、项目名、状态、耗时、短任务 ID、净化后的错误类别、HTTP 状态，以及当前任务最后一条 assistant 输出。最终输出保留换行、最多 1200 个字符，并在写入 outbox 前移除控制字符和遮盖明显的认证头、Cookie、token、API key、密码与 secret。watcher 只接受 rollout 中 `role=assistant` 的 `output_text`；CLI wrapper 只接受 `item.completed` 的 `agent_message`。不得包含用户 prompt、用户消息、完整会话、文件内容、认证值或原始请求/响应与错误正文。没有 assistant 结果的 API 失败或中断可以省略输出段。
 
 ## 阶段 5 现场验收
 
@@ -78,6 +78,6 @@ openclaw message send \
 
 ## 验证与提交规则
 
-当前软件验证为 `npm run check` 与 `npm test`，后者在 `a24bef4` 上为 26/26 通过。只有 [现场验收记录](live-acceptance.md) 中逐层留证的用例才构成阶段 5 证据；自动化测试本身不构成阶段 5 或 6 现场验收。
+当前软件验证为 `npm run check` 与 `npm test`，后者在 `373fd3d` 上为 30/30 通过。只有 [现场验收记录](live-acceptance.md) 中逐层留证的用例才构成阶段 5 证据；自动化测试本身不构成阶段 5 或 6 现场验收。2026-07-28 的 CLI 正常完成验收早于最终输出功能，不能据此宣称微信已显示该新增输出段。
 
 所有后续修改必须保留脏工作树、检查 `git status --short` 与相关 diff、只暂存本任务文件、运行 GitNexus `detect_changes`，本地提交且不 push。完整交接状态见 [Codex / Claude 交接](claude-handoff.md)。

@@ -15,6 +15,7 @@
 | `6edcbea` | 保持无 HTTP listener 的 watcher 进程存活 | 回归测试通过 |
 | `a24bef4` | 通过 PowerShell shim 安全执行 Windows OpenClaw | 26/26；本机真实命令退出码为 0 |
 | `071b203` | 刷新 GitNexus 生成文档 | 索引生成文件对齐 |
+| `373fd3d` | 通知附带净化后的最终 assistant 输出 | `npm run check` 与 `npm test` 通过，30/30；尚未做新增输出段的真实微信显示确认 |
 
 ## 阶段门禁
 
@@ -55,11 +56,17 @@ flowchart TB
 | 标签 | 当前已知事实 | 不能推出的结论 |
 | --- | --- | --- |
 | 实现完成 | watcher、outbox、OpenClaw adapter、可选 wrapper 都在代码中 | 不代表已运行或已向微信送达 |
-| 软件验证 | `npm run check` 和 `npm test` 均通过，测试数为 26 | 不代表真实 Codex 或微信现场行为 |
+| 软件验证 | `npm run check` 和 `npm test` 均通过，测试数为 30 | 不代表真实 Codex 或微信现场行为 |
 | 运输验证 | 一次真实 `openclaw message send` 成功退出，且收件人确认微信实际收到 | 不代表 Codex 终态被捕获 |
 | 现场验收 | CLI 正常完成用例已通过四层证据 | 只证明该用例，不代表全部生产验收完成 |
 
 已验证的 transport contract 只记录在 [发送契约](verified-openclaw-contract.md)。该契约的 account 和完整 target 从安全环境变量读取；绝不读取或把值写入代码、文档、Git、日志或聊天。
+
+## 最终输出字段
+
+`373fd3d` 扩展了原先的元数据通知：watcher 只读取当前根任务最后一条 assistant `output_text`，可选 CLI wrapper 只读取最后一个 `item.completed` 的 `agent_message`。`createEvent` 在任何 outbox 或 adapter 处理前统一移除控制字符、遮盖明显的认证头、Cookie、token、API key、密码和 secret，并截断到 1200 个字符；格式化时仅在非空时追加“输出”段。
+
+这项扩展不允许提取、持久化或投递用户 prompt、用户消息、完整会话、原始 API 请求/响应或原始错误正文。API 失败或中断没有 assistant 结果时，输出段应缺省。2026-07-28 已通过的 CLI 正常完成验收发生在该提交之前，所以只能证明终态运输链路，不能证明新增输出段已在微信端显示。
 
 ## OpenClaw 路径
 
@@ -87,7 +94,7 @@ CLI 正常完成用例的无敏感证据、时间和验证目录边界记录在 
 ## 禁止事项
 
 - 不删除、重建、重新登录、重新扫码或重复创建现有 OpenClaw、Gateway、Gateway 计划任务和两个微信 channel。
-- 不读取、输出、提交或索要 token、cookie、二维码、account、完整 target、会话正文、prompt、源码或请求/响应正文。
+- 不读取、输出、提交或索要 token、cookie、二维码、account、完整 target、用户 prompt、用户消息、完整会话、源码或原始请求/响应正文。只有净化、截断后的最后一条 assistant 输出可以进入通知。
 - 不改 `C:\Users\TheMapleBin\.codex\config.toml`，不改 `base_url`，不启用 `15722`，不新增计划任务或服务。
 - 不启用 Stop hook、API proxy 或 CLI wrapper 作为生产路径；wrapper 只在 watcher 不能提供精确 CLI 退出码时按需验证。
 - 不在阶段 5 之前运行常驻 watcher；不在阶段 6 之外注册任何通知服务。
