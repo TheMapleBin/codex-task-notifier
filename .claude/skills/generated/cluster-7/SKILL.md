@@ -1,60 +1,64 @@
 ---
 name: cluster-7
-description: "Skill for the Cluster_7 area of codex-openclaw-notifier. 7 symbols across 1 files."
+description: "Skill for the Cluster_7 area of codex-openclaw-notifier. 8 symbols across 1 files."
 ---
 
 # Cluster_7
 
-7 symbols | 1 files | Cohesion: 70%
+8 symbols | 1 files | Cohesion: 95%
 
 ## When to Use
 
 - Working with code in `src/`
-- Understanding how createEvent work
+- Understanding how updateContext, primeExisting, scanOnce work
 - Modifying cluster_7-related functionality
 
 ## Key Files
 
 | File | Symbols |
 |------|---------|
-| `src/event.mjs` | cleanText, asIsoTimestamp, workspaceBaseName, idPart, computeId (+2) |
+| `src/session-watcher.mjs` | findRolloutFiles, parseHttpStatus, errorKind, terminalEvent, updateContext (+3) |
 
 ## Entry Points
 
 Start here when exploring this area:
 
-- **`createEvent`** (Function) — `src/event.mjs:80`
+- **`updateContext`** (Function) — `src/session-watcher.mjs:79`
+- **`primeExisting`** (Function) — `src/session-watcher.mjs:85`
+- **`scanOnce`** (Function) — `src/session-watcher.mjs:103`
+- **`start`** (Function) — `src/session-watcher.mjs:151`
 
 ## Key Symbols
 
 | Symbol | Type | File | Line |
 |--------|------|------|------|
-| `createEvent` | Function | `src/event.mjs` | 80 |
-| `cleanText` | Function | `src/event.mjs` | 30 |
-| `asIsoTimestamp` | Function | `src/event.mjs` | 41 |
-| `workspaceBaseName` | Function | `src/event.mjs` | 52 |
-| `idPart` | Function | `src/event.mjs` | 60 |
-| `computeId` | Function | `src/event.mjs` | 64 |
-| `severityFor` | Function | `src/event.mjs` | 70 |
+| `updateContext` | Function | `src/session-watcher.mjs` | 79 |
+| `primeExisting` | Function | `src/session-watcher.mjs` | 85 |
+| `scanOnce` | Function | `src/session-watcher.mjs` | 103 |
+| `start` | Function | `src/session-watcher.mjs` | 151 |
+| `findRolloutFiles` | Function | `src/session-watcher.mjs` | 5 |
+| `parseHttpStatus` | Function | `src/session-watcher.mjs` | 21 |
+| `errorKind` | Function | `src/session-watcher.mjs` | 27 |
+| `terminalEvent` | Function | `src/session-watcher.mjs` | 37 |
 
 ## Execution Flows
 
 | Flow | Type | Steps |
 |------|------|-------|
 | `Start → CleanText` | cross_community | 5 |
-| `Handler → CleanText` | cross_community | 5 |
-| `ImportIncoming → CleanText` | cross_community | 5 |
+| `Start → ParseHttpStatus` | intra_community | 4 |
+| `Start → ErrorKind` | intra_community | 4 |
 | `Start → AsIsoTimestamp` | cross_community | 4 |
 | `Start → ComputeId` | cross_community | 4 |
-| `Handler → AsIsoTimestamp` | cross_community | 4 |
-| `Handler → ComputeId` | cross_community | 4 |
-| `SendEventToLocalService → CleanText` | cross_community | 4 |
-| `ImportIncoming → AsIsoTimestamp` | cross_community | 4 |
-| `ImportIncoming → ComputeId` | cross_community | 4 |
+
+## Connected Areas
+
+| Area | Connections |
+|------|-------------|
+| Cluster_15 | 1 calls |
 
 ## How to Explore
 
-1. `context({name: "createEvent"})` — see callers and callees
-2. `query({search_query: "cluster_7"})` — find related execution flows
+1. `gitnexus_context({name: "updateContext"})` — see callers and callees
+2. `gitnexus_query({query: "cluster_7"})` — find related execution flows
 3. Read key files listed above for implementation details
-4. `explain({target: "<file or symbol>"})` — persisted taint findings (source→sink data flows), when indexed with `--pdg`

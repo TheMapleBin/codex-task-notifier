@@ -1,69 +1,74 @@
 ---
 name: cluster-9
-description: "Skill for the Cluster_9 area of codex-openclaw-notifier. 11 symbols across 1 files."
+description: "Skill for the Cluster_9 area of codex-openclaw-notifier. 7 symbols across 4 files."
 ---
 
 # Cluster_9
 
-11 symbols | 1 files | Cohesion: 82%
+7 symbols | 4 files | Cohesion: 60%
 
 ## When to Use
 
 - Working with code in `src/`
-- Understanding how Outbox, enqueue, importIncoming work
+- Understanding how submit, isTerminalOutcome, enqueue work
 - Modifying cluster_9-related functionality
 
 ## Key Files
 
 | File | Symbols |
 |------|---------|
-| `src/outbox.mjs` | recordFileName, nowIso, listJsonFiles, readJson, replaceJson (+6) |
+| `src/outbox.mjs` | recordFileName, writeJsonAtomic, enqueue, stageIncoming |
+| `src/notifier-service.mjs` | submit |
+| `src/index.mjs` | onEvent |
+| `src/event.mjs` | isTerminalOutcome |
 
 ## Entry Points
 
 Start here when exploring this area:
 
-- **`Outbox`** (Class) — `src/outbox.mjs:67`
+- **`submit`** (Function) — `src/notifier-service.mjs:57`
+- **`isTerminalOutcome`** (Function) — `src/event.mjs:160`
 - **`enqueue`** (Method) — `src/outbox.mjs:87`
-- **`importIncoming`** (Method) — `src/outbox.mjs:118`
-- **`supersedePending`** (Method) — `src/outbox.mjs:135`
-- **`counts`** (Method) — `src/outbox.mjs:202`
+- **`stageIncoming`** (Method) — `src/outbox.mjs:111`
 
 ## Key Symbols
 
 | Symbol | Type | File | Line |
 |--------|------|------|------|
-| `Outbox` | Class | `src/outbox.mjs` | 67 |
+| `submit` | Function | `src/notifier-service.mjs` | 57 |
+| `isTerminalOutcome` | Function | `src/event.mjs` | 160 |
 | `enqueue` | Method | `src/outbox.mjs` | 87 |
-| `importIncoming` | Method | `src/outbox.mjs` | 118 |
-| `supersedePending` | Method | `src/outbox.mjs` | 135 |
-| `counts` | Method | `src/outbox.mjs` | 202 |
+| `stageIncoming` | Method | `src/outbox.mjs` | 111 |
 | `recordFileName` | Function | `src/outbox.mjs` | 6 |
-| `nowIso` | Function | `src/outbox.mjs` | 10 |
-| `listJsonFiles` | Function | `src/outbox.mjs` | 23 |
-| `readJson` | Function | `src/outbox.mjs` | 50 |
-| `replaceJson` | Function | `src/outbox.mjs` | 55 |
-| `retryDelayMs` | Function | `src/outbox.mjs` | 62 |
+| `writeJsonAtomic` | Function | `src/outbox.mjs` | 35 |
+| `onEvent` | Function | `src/index.mjs` | 27 |
 
 ## Execution Flows
 
 | Flow | Type | Steps |
 |------|------|-------|
+| `Start → CleanText` | cross_community | 5 |
+| `Start → AsIsoTimestamp` | cross_community | 5 |
+| `Start → ComputeId` | cross_community | 5 |
 | `ImportIncoming → CleanText` | cross_community | 5 |
-| `ImportIncoming → AsIsoTimestamp` | cross_community | 4 |
-| `ImportIncoming → ComputeId` | cross_community | 4 |
-| `ImportIncoming → RecordFileName` | intra_community | 3 |
+| `#processDue → RecordFileName` | cross_community | 4 |
+| `#processDue → NowIso` | cross_community | 4 |
+| `#processDue → WriteJsonAtomic` | cross_community | 4 |
+| `Start → RecordFileName` | cross_community | 4 |
+| `Start → NowIso` | cross_community | 4 |
+| `Start → WriteJsonAtomic` | cross_community | 4 |
 
 ## Connected Areas
 
 | Area | Connections |
 |------|-------------|
-| Cluster_7 | 3 calls |
-| Cluster_6 | 1 calls |
+| Cluster_15 | 2 calls |
+| Cluster_10 | 1 calls |
+| Cluster_11 | 1 calls |
+| Cluster_12 | 1 calls |
 
 ## How to Explore
 
-1. `context({name: "Outbox"})` — see callers and callees
-2. `query({search_query: "cluster_9"})` — find related execution flows
+1. `gitnexus_context({name: "submit"})` — see callers and callees
+2. `gitnexus_query({query: "cluster_9"})` — find related execution flows
 3. Read key files listed above for implementation details
-4. `explain({target: "<file or symbol>"})` — persisted taint findings (source→sink data flows), when indexed with `--pdg`
