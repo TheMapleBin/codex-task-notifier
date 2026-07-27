@@ -108,7 +108,10 @@ export function createNotifierService(config, { adapter = selectAdapter(config),
       });
     }
     timer = setInterval(tick, config.pollIntervalMs);
-    timer.unref();
+    // Keep the timer ref'd when running without an HTTP listener (watch mode)
+    // so the process stays alive. When a listener is open it already holds a
+    // ref on the event loop, so unref is safe there.
+    if (listen) timer.unref();
     await tick();
     return api;
   }

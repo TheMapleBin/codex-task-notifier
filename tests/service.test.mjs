@@ -4,6 +4,35 @@ import test from "node:test";
 import { createNotifierService } from "../src/notifier-service.mjs";
 import { httpRequest, temporaryDirectory, testConfig, unusedPort } from "./helpers.mjs";
 
+test("service timer is ref'd when running without an HTTP listener so the event loop stays alive", async () => {
+  // Regression: in watch mode (listen: false) the dispatch timer was unref'd,
+  // leaving no ref'd handles so the process exited immediately after printing
+  // the ready line. The timer must be ref'd when listen=false.
+  const home = await temporaryDirectory();
+  const capturedTimers = [];
+  const origSetInterval = globalThis.setInterval;
+  globalThis.setInterval = (...args) => {
+    const t = origSetInterval(...args);
+    capturedTimers.push(t);
+    return t;
+  };
+  const service = createNotifierService(testConfig(home), {
+    adapter: { name: "capture", send: async () => {} }
+  });
+  try {
+    await service.start({ listen: false });
+    assert.ok(capturedTimers.length > 0, "setInterval must have been called");
+    const dispatchTimer = capturedTimers[capturedTimers.length - 1];
+    assert.ok(
+      dispatchTimer.hasRef(),
+      "dispatch timer must be ref'd when listen=false — otherwise the watch process exits immediately"
+    );
+  } finally {
+    globalThis.setInterval = origSetInterval;
+    await service.close();
+  }
+});
+
 test("notification service accepts loopback events and dispatches them", async () => {
   const home = await temporaryDirectory();
   const servicePort = await unusedPort();
