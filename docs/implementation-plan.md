@@ -37,7 +37,7 @@ Codex Desktop/CLI rollout JSONL
 
 ## QQ Bot 迁移状态
 
-QQ Bot 迁移目前仅完成只读方案调查，尚未安装、配置或接入生产。分阶段计划见 [QQ Bot 迁移计划](qqbot-migration-plan.md)。在 QQ 的真实主动消息、重启免绑定、错误重试和用户收件验收全部通过前，生产 transport 继续保持直接微信 iLink。
+QQ Bot 迁移已完成直接 HTTPS adapter、DPAPI 配置读取和本地单元测试；没有安装 OpenClaw，也没有切换生产。真实主动消息、一次性绑定、重启免绑定、错误重试和用户收件验收仍未完成。分阶段门禁见 [QQ Bot 迁移计划](qqbot-migration-plan.md)；在其全部通过前，生产 transport 继续保持直接微信 iLink。
 
 ## 下一步
 

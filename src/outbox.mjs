@@ -83,6 +83,14 @@ function safeErrorCode(error) {
   return typeof error?.code === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(error.code) ? error.code : null;
 }
 
+function retryDelayForError(record, config, error) {
+  const retryAfterMs = Number(error?.retryAfterMs);
+  if (Number.isInteger(retryAfterMs) && retryAfterMs >= 1_000) {
+    return Math.min(config.retryMaxMs, retryAfterMs);
+  }
+  return retryDelayMs(record, config);
+}
+
 export class Outbox {
   constructor(config) {
     this.config = config;
@@ -228,10 +236,14 @@ export class Outbox {
         const updated = {
           ...record,
           attempts,
-          nextAttemptAt: new Date(now.getTime() + (contextBlocked ? this.config.retryMaxMs : retryDelayMs({ ...record, attempts }, this.config))).toISOString(),
+          nextAttemptAt: new Date(now.getTime() + (contextBlocked ? this.config.retryMaxMs : retryDelayForError({ ...record, attempts }, this.config, error))).toISOString(),
           lastErrorCode: safeErrorCode(error),
           lastError: String(error?.message || error).slice(0, 160)
         };
+        if (error?.retryable === false) {
+          await this.#moveToFailed(filePath, { ...updated, terminalReason: "non_retryable" });
+          continue;
+        }
         await replaceJson(filePath, updated);
       }
     }

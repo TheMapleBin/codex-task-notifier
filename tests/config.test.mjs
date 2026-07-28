@@ -40,3 +40,15 @@ test("WeChat test-account adapter uses only a protected configuration path", () 
   assert.equal(config.wechatTestAccount.powershell, "C:\\Program Files\\PowerShell\\7\\pwsh.exe");
   assert.equal(Object.hasOwn(config.wechatTestAccount, "appSecret"), false);
 });
+
+test("direct QQ Bot adapter uses only a protected configuration path", () => {
+  const config = loadConfig(baseEnv({
+    CODEX_NOTIFY_ADAPTER: "qqbot",
+    CODEX_NOTIFY_QQBOT_CONFIG: "C:\\secure\\qqbot.dpapi.json",
+    CODEX_NOTIFY_POWERSHELL: "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
+  }));
+  assert.equal(config.adapter, "qqbot");
+  assert.equal(config.qqbot.configPath, "C:\\secure\\qqbot.dpapi.json");
+  assert.equal(config.qqbot.powershell, "C:\\Program Files\\PowerShell\\7\\pwsh.exe");
+  assert.equal(Object.hasOwn(config.qqbot, "appSecret"), false);
+});

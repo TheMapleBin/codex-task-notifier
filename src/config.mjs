@@ -63,6 +63,10 @@ function resolveDefaultWechatTestConfig(env) {
   return path.join(resolveDefaultHome(env), "secure", "wechat-test-account.dpapi.json");
 }
 
+function resolveDefaultQQBotConfig(env) {
+  return path.join(resolveDefaultHome(env), "secure", "qqbot.dpapi.json");
+}
+
 export function loadConfig(env = process.env) {
   const serviceHost = env.CODEX_NOTIFY_HOST || DEFAULT_SERVICE_HOST;
   if (!isLoopbackHost(serviceHost)) {
@@ -78,8 +82,8 @@ export function loadConfig(env = process.env) {
   }
 
   const adapter = env.CODEX_NOTIFY_ADAPTER || "dry-run";
-  if (!["dry-run", "ilink", "wechat-test-account"].includes(adapter)) {
-    throw new Error("CODEX_NOTIFY_ADAPTER must be dry-run, ilink, or wechat-test-account.");
+  if (!["dry-run", "ilink", "wechat-test-account", "qqbot"].includes(adapter)) {
+    throw new Error("CODEX_NOTIFY_ADAPTER must be dry-run, ilink, wechat-test-account, or qqbot.");
   }
 
   const home = path.resolve(env.CODEX_NOTIFY_HOME || resolveDefaultHome(env));
@@ -138,6 +142,15 @@ export function loadConfig(env = process.env) {
         min: 1_000,
         max: 300_000,
         name: "CODEX_NOTIFY_WECHAT_TEST_TIMEOUT_MS"
+      })
+    }),
+    qqbot: Object.freeze({
+      configPath: path.resolve(env.CODEX_NOTIFY_QQBOT_CONFIG || resolveDefaultQQBotConfig(env)),
+      powershell: env.CODEX_NOTIFY_POWERSHELL || "pwsh.exe",
+      timeoutMs: integerFromEnv(env.CODEX_NOTIFY_QQBOT_TIMEOUT_MS, 45_000, {
+        min: 1_000,
+        max: 300_000,
+        name: "CODEX_NOTIFY_QQBOT_TIMEOUT_MS"
       })
     }),
     retryBaseMs,

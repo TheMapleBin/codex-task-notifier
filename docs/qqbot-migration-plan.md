@@ -1,128 +1,95 @@
-# QQ Bot 迁移计划
+# QQ Bot 直连迁移计划
 
-## 目标
+## 已确认的路线
 
-将当前 Codex Desktop/CLI 任务终态通知从微信 iLink 迁移到腾讯 QQ Bot C2C 主动消息，同时保留现有 watcher、持久 outbox、敏感信息净化、子代理过滤和跟随 Codex 启停机制。
-
-目标不是引入完整 OpenClaw，而是先验证并优先采用腾讯 QQ Bot Node.js SDK 的最小直连 adapter。只有直连路径无法满足运行或验收要求时，才评估官方 OpenClaw QQ channel 插件。
+Codex 通知将使用仓库内的 QQ Bot HTTPS adapter，不安装、不启动、也不依赖 OpenClaw 或其 Gateway。现有微信 iLink 路线继续作为生产回滚，直到 QQ 的真实现场验收完成。
 
 ```text
-Codex Desktop/CLI rollout JSONL
+Codex Desktop / CLI rollout JSONL
   -> 现有 session watcher
   -> 现有持久 outbox
-  -> QQ Bot adapter（C2C 主动消息）
-  -> QQ 用户 openid
+  -> 直接 QQ Bot HTTPS adapter
+  -> QQ C2C 主动文本消息
 ```
+
+首次取得用户 `openid` 时，才需要短暂运行一次独立的 QQ Gateway 绑定器；它不是日常 watcher 的依赖，也不需要 OpenClaw。绑定后 `openid` 会和 AppID/AppSecret 一起 DPAPI 加密，日常投递只使用 HTTPS。
 
 ## 当前边界
 
-- 当前生产 transport 仍为直接腾讯微信 iLink；本计划尚未执行。
-- 不安装 QQ 插件、不创建 OpenClaw Gateway、不新增计划任务、不修改 Codex 全局配置。
-- 不删除微信 iLink、微信公众号测试号配置或已有 DPAPI 状态；QQ 验收通过前不得切换生产 transport。
-- 不读取、输出或提交 AppSecret、access token、openid、二维码凭据、消息正文或原始请求/响应正文。
-- 不通知子代理；保持现有 parent/thread source/agent path 过滤规则。
-- 不把 SDK 返回成功、HTTP 200、进程运行或 outbox `delivered` 单独视为 QQ 手机端已收到；仍需用户现场确认。
+- 当前生产 transport 仍为直接微信 iLink；本计划尚未授权切换它。
+- 不删除 iLink、微信公众号测试号配置、已有 DPAPI 状态、旧 outbox 记录或用户已有脏工作树修改。
+- 不修改 `C:\Users\TheMapleBin\.codex\config.toml`、`base_url`、`15722`，不新增 watcher、服务、代理、hook 或计划任务。
+- 不读取、输出、提交或写日志记录 AppSecret、access token、openid、二维码凭据、消息正文或原始请求/响应正文。
+- 不通知子代理；沿用现有根任务过滤、去重、任务名称解析、2400 字输出上限和末尾元数据净化。
+- HTTP 成功、SDK 返回、outbox `delivered` 或进程运行都不能单独证明 QQ 客户端实际收到；必须由收件人确认。
 
-## 已知技术事实
+## 本机与官方 SDK 已核对的契约
 
-基于腾讯官方 `@tencent-connect/qqbot-nodejs` SDK 和 `@tencent-connect/openclaw-qqbot` 插件的只读审计：
+对 `@tencent-connect/qqbot-nodejs@1.0.4` 的只读审计与腾讯 QQ Bot 官方入口一致：
 
-- 不带 `msgId` 的 `sendText` 走 C2C/群组主动消息接口；不依赖最近一条入站消息的会话上下文。
-- C2C 主动消息目标是用户 `openid`；群组目标是群组 `openid`；QQ 频道不支持该主动消息路径。
-- SDK 使用 `appId + appSecret` 自动获取和缓存 access token，按 `expires_in` 管理并提前刷新；这与微信 iLink 的 `context_token` 不是同一种生命周期。
-- SDK 对网络、HTTP 错误、HTTP 429 和 QQ 业务错误抛出结构化错误；发送层仍需由现有 outbox 负责持久重试。
-- 官方插件的被动回复限制器默认每条入站消息最多 4 次、跟踪 TTL 1 小时；过期时可去掉 `msgId` 降级主动发送。这是插件策略，不是本项目可靠投递的替代品。
-- QQ 主动消息存在平台额度/频率限制，但 SDK 和插件未给出统一固定的每日数字；必须把 429/业务限流作为可重试错误处理。
+- 获取 token：`POST https://bots.qq.com/app/getAppAccessToken`，JSON 为 `{ appId, clientSecret }`。
+- C2C 主动消息：`POST https://api.sgroup.qq.com/v2/users/{openid}/messages`，请求头为 `Authorization: QQBot <access_token>`。
+- 主动纯文本正文为 `{ content, msg_type: 0 }`，不传 `msg_id`，因此不依赖微信 iLink 的最近入站 `context_token`。
+- 正常消息响应含 `id`；adapter 只保存脱敏后的发送结果，不保存响应正文。
+- token 按 `expires_in` 缓存并提前刷新；401/403 发送失败会最多刷新一次 token 后重试。
+- 429、网络错误、超时、5xx 保持在 outbox 中退避重试；明确的鉴权/参数/目标拒绝会以脱敏错误直接移到 `failed`，避免无意义地耗尽重试。
 
-## 分阶段计划
+QQ 平台仍可能存在额度或频率限制，无法从 SDK 推导固定的全局数字；429 必须按真实响应处理，不能被当作永久成功或无限配额。
 
-### 阶段 0：只读基线与安全检查
+## 已实现但尚未上线的内容
 
-1. 读取 `notifier-status.cmd`、`auto-notifier-status.cmd`、Git 状态和当前 transport 选择。
-2. 确认只有一个 watcher、一个 lifecycle supervisor 和现有 `CodexWeChatNotifierLifecycle` 计划任务。
-3. 只读确认 QQ Bot SDK 版本、主动消息 endpoint、错误字段和 Token 生命周期；不打印凭据或正文。
-4. 记录当前 iLink 的可回滚状态，不改生产配置。
+- `src/adapters/qqbot.mjs`：原生 `fetch` 的 C2C 主动消息 adapter；无 npm 运行依赖、无 OpenClaw 子进程。
+- `src/qqbot-config.mjs` 与 `scripts/qqbot-config.ps1`：只从当前 Windows 用户 DPAPI 读取 AppID、AppSecret、openid。
+- `bind-qqbot.cmd`：一次性原生 QQ Gateway 绑定器，收到一条 C2C 消息后直接 DPAPI 加密保存 OpenID 并退出；不常驻、不使用 OpenClaw。
+- `configure-qqbot.cmd`、`qqbot-status.cmd`、`test-qqbot.cmd`：手工配置、只读状态、一次短消息 smoke test；均不改当前生产 transport。
+- token 缓存、401 刷新一次、超时、离线、429 Retry-After、不可重试拒绝和敏感信息不外泄的单元测试。
+- outbox 新增 `retryable=false` 和 `retryAfterMs` 的受限处理；既有 iLink context 过期路径不变。
 
-**门禁：** 只有确认工作树脏改动已隔离、现有 watcher 未被重复启动、QQ 依赖和 API 契约有本机/官方证据，才能进入阶段 1。
+仍未完成：真实 QQ 绑定、真实 C2C 实发、重启后复测、watcher 实发和生产切换。没有这些现场证据前，不能宣称 QQ 已接入生产。
 
-### 阶段 1：QQ 凭据与目标建立
+## 后续阶段与门禁
 
-1. 用户在腾讯 QQ 开放平台创建或提供已有 QQ Bot 的 AppID/AppSecret。
-2. 启动最小一次性绑定流程，让用户在 QQ C2C 私聊中向机器人发送一条消息。
-3. 从入站事件安全提取并 DPAPI 加密保存 `accountId`、用户 `openid` 和必要的非敏感配置。
-4. 目标标识只通过安全环境/加密存储读取，禁止出现在命令行、日志、文档和 Git。
+### 阶段 1：一次性绑定并加密保存目标
 
-**门禁：** 必须证明同一 `openid` 可在进程重启后复用；若只能依赖每次用户重新发消息，则暂停迁移并报告。
+1. 用户在 <https://q.qq.com/qqbot/openclaw/index.html> 创建或选择 QQ Bot，取得 AppID/AppSecret。
+2. 在 QQ Bot 控制台为该机器人启用 C2C/群聊消息事件权限；若未启用，绑定器会给出脱敏的 `QQBOT_BIND_INTENT_NOT_ENABLED`。
+3. 运行短生命周期、直接 QQ Gateway 绑定器；用户仅需向机器人发一次“绑定”。绑定器从 `C2C_MESSAGE_CREATE.author.user_openid` 提取目标，绝不打印它，随后立即 DPAPI 加密并退出。
+4. 不使用 OpenClaw，不把凭据放进命令行、环境变量、仓库或日志。
+
+**门禁：** 配置文件必须属于当前用户、状态命令只显示 `Configured: yes`，且绑定器退出后没有任何常驻 Gateway。
 
 ### 阶段 2：最小真实 QQ 主动发送
 
-1. 使用 QQ C2C 主动消息接口手工发送一条短测试消息，例如“Codex QQ 通知链路测试 + 时间戳”。
-2. 记录脱敏后的命令/adapter 契约、HTTP 状态类别、业务错误类别和返回消息 ID。
-3. 等待用户确认 QQ 客户端实际收到；未确认不得切换 watcher adapter。
-4. 重启一次发送进程后，在不重新绑定的情况下再次发送，验证 openid 和 Token 自动恢复。
+1. 运行 `test-qqbot.cmd` 发送“Codex QQ 通知链路测试 + 时间戳”。
+2. 记录仅含 transport、退出状态和脱敏错误类别的本机证据；不打印 token/openid/正文/原始响应。
+3. 等待用户确认 QQ 客户端实际收到。
+4. 停止并重新运行 smoke test；不重新发送“绑定”，再次等待用户确认。
 
-**门禁：** 必须同时满足发送命令成功、返回消息 ID、用户实际收到、重启后无需重新绑定；任何一项失败都保留 iLink 生产路径。
+**门禁：** 两次发送命令成功、两次客户端收件确认、且重启无需重新绑定。任一项失败则继续使用 iLink。
 
-### 阶段 3：实现 QQ adapter
+### 阶段 3：受控 watcher 验收
 
-1. 在现有 adapter 接口下新增 QQ 实现，复用 outbox、去重、退避、超时、敏感信息净化和状态统计。
-2. 第一版只支持 C2C 文本主动消息；不实现频道、群组、媒体、流式消息或完整 OpenClaw channel。
-3. 对 Token 获取失败、HTTP 429、权限错误、目标无效、网络超时分别归类；可重试错误留在 pending，不可重试错误进入 sanitized failed 状态。
-4. 保留 iLink adapter 和 transport selector，默认仍为 iLink，QQ 只能通过显式测试选择器启用。
-5. 增加单元测试：请求构造、无 `msgId` 主动发送、Token 不泄露、错误分类、超时、429 退避、离线恢复和消息净化。
-
-**门禁：** `npm run check`、`npm test`、`git diff --check` 全部通过；不能影响现有 iLink 测试和运行状态。
-
-### 阶段 4：watcher 集成与可控现场测试
-
-按现有 outbox 契约逐项验证，不把模拟测试当真实收件：
+仅在阶段 2 通过后，以显式测试选择器让现有 watcher 使用 QQ adapter，依次验收：
 
 1. Desktop 正常完成。
 2. Desktop API 错误。
 3. CLI 正常完成。
-4. CLI 非零退出或 API 错误。
-5. 用户中断/`turn_aborted`。
-6. QQ API 暂时离线后恢复重试。
-7. watcher 进程重启后无需重新绑定发送。
-8. 子代理完成事件不发送。
-9. 长输出、任务名称、末尾内部元数据净化与 2400 字上限保持不回退。
+4. CLI 非零退出/API 错误。
+5. 用户中断。
+6. QQ API 离线/429 后的持久 outbox 恢复。
+7. 子代理终态不投递。
+8. 长输出、任务名称和末尾内部元数据净化不回退。
 
-每个用例必须分别记录：事件已捕获、已入 outbox、发送命令成功、QQ 客户端实际收到。
+每项必须分开记录：事件捕获、已入 outbox、发送命令成功、QQ 客户端实际收到。
 
-### 阶段 5：生产切换（需用户确认）
+### 阶段 4：生产切换（需再次明确确认）
 
-只有阶段 0-4 全部通过，且用户明确确认后：
-
-1. 备份当前 selector 和 QQ DPAPI 配置状态，不复制明文凭据。
-2. 将 transport selector 从 iLink 切换到 QQ adapter。
-3. 保留同一个 watcher、同一个 lifecycle supervisor 和同一个计划任务，不创建第二套常驻体系。
-4. 首次生产运行持续观察 pending、delivered、failed、429 和 Token 刷新状态。
-5. 任一关键验收失败时，使用现有 selector 回滚到 iLink，不删除 QQ 配置。
+只有阶段 1-3 全部完成后，才允许将现有 transport selector 从 iLink 切到 `qqbot`。切换时保持同一 watcher、同一 lifecycle supervisor 和同一登录计划任务；不创建第二套常驻体系。首次运行必须观察 pending、delivered、failed、429 和 token 刷新。任何关键验收失败立即切回 iLink。
 
 ## 回滚条件
 
-出现以下任一情况，立即停止 QQ 生产切换并恢复 iLink：
-
-- QQ 主动消息需要用户再次发消息才能发送。
-- QQ 手机端未收到但 adapter 报告成功，且无法取得可解释的错误信号。
-- Token 刷新、429 或网络恢复导致 pending 无法自动重试。
-- 现有 2400 字输出净化、任务名称、子代理过滤或生命周期行为回归。
-- 需要引入 OpenClaw Gateway、第二个 watcher、代理、Stop hook 或新的计划任务才能工作。
-
-## 暂不做的事项
-
-- 不安装完整 OpenClaw。
-- 不启用 QQ 频道主动消息。
-- 不实现 QQ 流式 `stream_messages` 作为通知通道。
-- 不把 QQ 平台额度当作无限推送能力。
-- 不删除微信 iLink、测试号配置、旧 outbox failed 记录或用户已有脏工作树修改。
-
-## 完成定义
-
-QQ 迁移只有在以下证据齐全后才可称为完成：
-
-- QQ C2C 主动消息契约已记录且凭据不出现在仓库。
-- 进程重启后无需重新绑定即可发送。
-- Desktop/CLI 正常、异常、中断和离线恢复均完成真实现场验收。
-- 每条验收均有捕获、入队、发送成功和用户收件四级证据。
-- iLink 可一键回滚，工作树和现有计划任务未被破坏。
+- QQ 主动发送仍要求用户每次先发消息。
+- QQ 客户端未收到而 adapter 显示成功，且没有可解释的脱敏失败信号。
+- 429、token 刷新、网络恢复或重启导致 outbox 不能自动恢复。
+- 现有子代理过滤、任务名称、输出净化或生命周期行为回退。
+- 需要引入 OpenClaw Gateway、第二个 watcher、代理、Stop hook 或新计划任务才能工作。

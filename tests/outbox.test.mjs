@@ -31,6 +31,21 @@ test("outbox deduplicates, retries, and eventually delivers", async () => {
   assert.deepEqual(await outbox.counts(), { pending: 0, delivered: 1, failed: 0, incoming: 0 });
 });
 
+test("outbox moves explicitly non-retryable delivery failures to failed without exhausting retries", async () => {
+  const home = await temporaryDirectory();
+  const outbox = new Outbox(testConfig(home));
+  await outbox.init();
+  await outbox.enqueue(createEvent({ source: "session-watcher", kind: "turn_finished", turnId: "turn-no-retry" }));
+  await outbox.processDue({ send: async () => {
+    const error = new Error("QQBOT_SEND_REJECTED");
+    error.code = "QQBOT_SEND_REJECTED";
+    error.retryable = false;
+    throw error;
+  } });
+  assert.deepEqual(await outbox.counts(), { pending: 0, delivered: 0, failed: 1, incoming: 0 });
+  await fs.rm(path.join(home, "outbox"), { recursive: true, force: true });
+});
+
 test("terminal event suppresses a pending generic Stop event", async () => {
   const home = await temporaryDirectory();
   const outbox = new Outbox(testConfig(home));

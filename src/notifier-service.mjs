@@ -3,6 +3,7 @@ import http from "node:http";
 import { createIlinkAdapter } from "./adapters/ilink.mjs";
 import { createDryRunAdapter } from "./adapters/dry-run.mjs";
 import { createWechatTestAccountAdapter } from "./adapters/wechat-test-account.mjs";
+import { createQQBotAdapter } from "./adapters/qqbot.mjs";
 import { createEvent, isTerminalOutcome } from "./event.mjs";
 import { Outbox } from "./outbox.mjs";
 
@@ -50,6 +51,7 @@ function readJsonBody(request) {
 function selectAdapter(config, options = {}) {
   if (config.adapter === "ilink") return createIlinkAdapter(config, options);
   if (config.adapter === "wechat-test-account") return createWechatTestAccountAdapter(config);
+  if (config.adapter === "qqbot") return createQQBotAdapter(config);
   return createDryRunAdapter(config);
 }
 
