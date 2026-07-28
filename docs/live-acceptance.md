@@ -10,7 +10,7 @@
 
 直接 iLink 验收期间未修改 `C:\Users\TheMapleBin\.codex\config.toml`、`base_url` 或 `15722`。
 
-用户报告真实消息尾部包含 `<oai-mem-citation>` 内部元数据。统一净化层已修复，并新增安全任务名称；42/42 自动化测试通过。修复后的微信显示需要由后续真实完成通知再次确认。
+用户报告真实消息尾部包含 `<oai-mem-citation>` 内部元数据。统一净化层已修复，并新增安全任务名称；39/39 自动化测试通过。修复后的微信显示需要由后续真实完成通知再次确认。
 
 ## 尚未通过
 
@@ -21,4 +21,4 @@
 | 用户中断 | 未验收 |
 | 微信暂时离线后恢复 | 未验收 |
 
-当前允许保持一个直接 iLink watcher 运行，但不得启用代理、hook、wrapper、第二个 watcher、服务或计划任务。
+当前允许一个直接 iLink watcher，以及唯一的 `CodexWeChatNotifierLifecycle` 生命周期计划任务；不得启用代理、hook、wrapper、第二个 watcher、服务或其他计划任务。

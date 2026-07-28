@@ -47,7 +47,8 @@ This project is indexed by GitNexus as **codex-openclaw-notifier** (269 symbols,
 
 The current production path is one watcher with a built-in Tencent WeChat iLink adapter. Direct iLink delivery and final assistant output were user-confirmed on 2026-07-28. Read `docs/claude-handoff.md`, `docs/implementation-plan.md`, and `docs/verified-ilink-contract.md` before changes.
 
-- Check `notifier-status.cmd` before starting anything. Never run a second watcher, Gateway, service, proxy, or schedule.
+- Check `notifier-status.cmd` and `auto-notifier-status.cmd` before starting anything. Never run a second watcher, Gateway, service, proxy, or lifecycle schedule.
+- The only approved schedule is `CodexWeChatNotifierLifecycle`, installed by `enable-auto-notifier.cmd`; it may manage only the existing watcher.
 - Never read, print, log, commit, or request bot tokens, context tokens, user IDs, QR material, prompts, messages, source text, or request/response bodies.
 - Task names use explicit `threads.name` first, then the Codex UI `threads.title`; always apply length limits and credential redaction.
 - Do not change `C:\Users\TheMapleBin\.codex\config.toml`, `base_url`, or enable `15722`, Stop hook, production CLI wrapper, or API proxy.
