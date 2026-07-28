@@ -52,7 +52,7 @@ The current production path is one watcher with a built-in Tencent WeChat iLink 
 - Never read, print, log, commit, or request bot tokens, context tokens, user IDs, QR material, prompts, messages, source text, or request/response bodies.
 - Task names use explicit `threads.name` first, then the Codex UI `threads.title`; always apply length limits and credential redaction.
 - Never notify subagent completion; filter session metadata carrying parent thread, subagent thread source, agent path, or subagent source markers.
-- Sanitize complete, orphaned, and HTML-escaped citation/rollout metadata before applying the final-output length limit.
+- Sanitize complete, orphaned, and HTML-escaped citation/rollout metadata before applying the final-output length limit. Also remove only allowlisted Codex UI directives (`::git-commit`, `::created-thread`, `::code-comment`) when they are standalone trailing lines; preserve ordinary `::` text in the body.
 - The 2400-character output and metadata-tail sanitizer passed real WeChat display acceptance; do not reduce the limit or remove these filters without a new regression case.
 - Keep the lightweight supervisor-driven lifecycle: start the watcher when any `codex.exe` is active and stop it 30 seconds after all Codex processes exit.
 - Coalesce pending terminal outcomes by correlation key so only the newest state for one task consumes a refreshed iLink context.

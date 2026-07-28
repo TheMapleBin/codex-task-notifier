@@ -12,7 +12,7 @@
 - DPAPI 会话状态已通过 watcher 完整停止和换 PID 重启验收，无需再次绑定即可投递，因此 watcher 可以安全跟随 Codex 启停。
 - 不读取或发送用户 prompt、用户消息、完整会话、源码、原始请求/响应正文。
 - 任务名称优先使用 `threads.name`，否则使用 Codex UI 的 `threads.title`，并进行限长和敏感值净化。
-- 最终输出在截断前移除完整、残缺和 HTML 转义的 citation/rollout 内部元数据并进行凭据净化，最多 2400 字符；真实微信复验已确认内容完整且无内部尾块。
+- 最终输出在截断前移除完整、残缺和 HTML 转义的 citation/rollout 内部元数据，并删除末尾独立行中的 `::git-commit`、`::created-thread`、`::code-comment`，再进行凭据净化，最多 2400 字符。正文中的普通 `::` 不删除；UI 指令规则等待真实微信复验。
 - 只允许一个 watcher。`npm run watch` 与 `start-notifier.cmd` 不得同时运行。
 
 日常建议运行一次 `enable-auto-notifier.cmd`，之后无需手工启动。关闭最后一个 Codex 进程 30 秒后 watcher 自动退出，下次启动 Codex 时从 DPAPI 状态恢复。整机冷启动尚未现场验收；若腾讯服务端明确提示 context 失效，只需在微信里向机器人发一条消息，不需要重新扫码。

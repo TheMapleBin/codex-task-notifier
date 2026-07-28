@@ -104,6 +104,42 @@ test("event contract removes orphaned and escaped internal metadata tails before
   assert.equal(escaped.finalOutput, "用户可见。");
 });
 
+test("event contract removes a trailing Codex UI directive", () => {
+  const event = createEvent({
+    source: "session-watcher",
+    kind: "turn_finished",
+    turnId: "turn-ui-directive",
+    finalOutput: "已完成本地提交。\r\n::git-commit{cwd=\"D:\\Shared\\project\"}  \r\n"
+  });
+
+  assert.equal(event.finalOutput, "已完成本地提交。");
+  assert.doesNotMatch(formatEventForDelivery(event), /::git-commit/);
+});
+
+test("event contract removes only allowlisted trailing UI directives", () => {
+  const event = createEvent({
+    source: "session-watcher",
+    kind: "turn_finished",
+    turnId: "turn-ui-directives",
+    finalOutput: [
+      "正文中的 C++::value 和 ::ordinary{content} 必须保留。",
+      "::git-commit{cwd=\"D:\\Shared\\project\"}",
+      " ::created-thread{threadId=\"thread-1\"}",
+      "::code-comment{title=\"internal\" file=\"src/a.mjs\" start=1}"
+    ].join("\n")
+  });
+
+  assert.equal(event.finalOutput, "正文中的 C++::value 和 ::ordinary{content} 必须保留。");
+
+  const bodyDirective = createEvent({
+    source: "session-watcher",
+    kind: "turn_finished",
+    turnId: "turn-body-directive",
+    finalOutput: "::git-commit{cwd=\"example\"}\n后续正文"
+  });
+  assert.equal(bodyDirective.finalOutput, "::git-commit{cwd=\"example\"}\n后续正文");
+});
+
 test("event contract preserves unrelated XML-like text", () => {
   const event = createEvent({
     source: "session-watcher",

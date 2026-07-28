@@ -56,6 +56,7 @@ function redactSensitiveText(value) {
 
 function stripInternalMetadata(value) {
   const withoutCompleteBlocks = String(value)
+    .replace(/\r\n?/g, "\n")
     .replace(/<oai-mem-citation\b[^>]*>[\s\S]*?<\/oai-mem-citation\s*>/gi, "")
     .replace(/&lt;oai-mem-citation\b[\s\S]*?&lt;\/oai-mem-citation\s*&gt;/gi, "");
   const orphanMarkers = [
@@ -73,7 +74,14 @@ function stripInternalMetadata(value) {
     const match = marker.exec(withoutCompleteBlocks);
     if (match && match.index < cutoff) cutoff = match.index;
   }
-  return withoutCompleteBlocks.slice(0, cutoff);
+  const lines = withoutCompleteBlocks.slice(0, cutoff).split("\n");
+  const internalDirective = /^::(?:git-commit|created-thread|code-comment)\{[^\r\n]*\}$/;
+  while (lines.length) {
+    while (lines.length && !lines.at(-1).trim()) lines.pop();
+    if (!lines.length || !internalDirective.test(lines.at(-1).trim())) break;
+    lines.pop();
+  }
+  return lines.join("\n");
 }
 
 function safeFinalOutput(value) {

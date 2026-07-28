@@ -5,8 +5,8 @@
 - 当前生产路径是直接腾讯 iLink。
 - 唯一 watcher 由 `start-notifier.cmd` 管理，并由登录计划任务中的轻量 supervisor 跟随 `codex.exe` 启停；全部 Codex 退出 30 秒后停止。先运行状态命令，不要启动第二个。
 - DPAPI schema 2 已配置，真实微信已确认收到直接 iLink 通知。
-- 45/45 自动化测试通过。
-- 2400 字符输出与 citation/rollout 尾部清理已完成软件验证和真实微信复验；用户确认内容完整且没有其他内部文字。
+- 47/47 自动化测试通过。
+- 2400 字符输出与 citation/rollout 尾部清理已完成真实微信复验。随后发现末尾 `::git-commit{...}` 仍会外泄，现已增加 Codex UI 指令白名单清理，等待下一条真实微信通知复验。
 - API 错误、中断和离线恢复尚未全部验收。
 - 稳定 UIN、更新游标和最新 context 已使用独立 DPAPI blob 持久化；完整 watcher 停止和换 PID 重启后，无绑定真实投递已通过。整机冷启动尚未现场验收，不得提前宣称通过。
 - 不得再次把 watcher 改为无条件常驻；当前用户明确要求 Desktop/CLI 关闭后 30 秒停止、启动时自动恢复。
@@ -21,7 +21,7 @@
 - 不读取、输出、提交 bot token、context token、用户 ID、二维码材料、prompt、消息正文、源码或原始请求/响应。
 - 任务名称优先使用 `threads.name`，否则使用 Codex UI 的 `threads.title`，并进行限长和敏感值净化。
 - 子代理必须通过 `session_meta` 的 parent/thread source/agent path/source 标记过滤，不发送完成通知。
-- 最终输出上限为 2400 字符；必须在截断前清除完整、残缺和 HTML 转义的 citation/rollout 内部元数据尾块。
+- 最终输出上限为 2400 字符；必须在截断前清除完整、残缺和 HTML 转义的 citation/rollout 内部元数据尾块，以及末尾独立行中的 `::git-commit`、`::created-thread`、`::code-comment`。不得泛化为删除正文中的任意 `::` 内容。
 
 ## 接手步骤
 

@@ -21,7 +21,7 @@ Codex Desktop/CLI rollout JSONL
 | watcher/outbox/iLink adapter | 完成；软件测试通过 |
 | Desktop/CLI 生命周期 | 完成；轻量 supervisor 按 `codex.exe` 启动 watcher，全部退出 30 秒后停止 |
 | 正常完成真实投递 | 完成；用户确认收到两条通知 |
-| 内部 citation 清理 | 已修复并完成真实微信复验；2400 字符输出完整且无内部尾块 |
+| 内部尾部清理 | citation/rollout 已完成真实微信复验；Codex UI 尾部指令已完成软件修复，等待真实微信复验 |
 | 安全任务名称 | 已实现；显式名称优先，prompt 副本被拒绝 |
 | API 错误、中断、离线恢复 | 尚未完成真实验收 |
 | iLink context 恢复 | DPAPI 会话恢复已通过进程重启真实验收；整机冷启动尚未验收 |
