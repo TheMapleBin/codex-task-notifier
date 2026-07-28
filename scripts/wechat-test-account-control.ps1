@@ -36,7 +36,14 @@ function Set-PrivateDirectoryAcl {
         [System.Security.AccessControl.PropagationFlags]::None,
         [System.Security.AccessControl.AccessControlType]::Allow
     ))
-    [System.IO.FileSystemAclExtensions]::SetAccessControl([System.IO.DirectoryInfo]::new($Path), $acl)
+    $directoryInfo = [System.IO.DirectoryInfo]::new($Path)
+    if ($directoryInfo.PSObject.Methods.Name -contains 'SetAccessControl') {
+        $directoryInfo.SetAccessControl($acl)
+    } elseif ('System.IO.FileSystemAclExtensions' -as [type]) {
+        [System.IO.FileSystemAclExtensions]::SetAccessControl($directoryInfo, $acl)
+    } else {
+        throw 'This PowerShell runtime cannot apply a private directory ACL.'
+    }
 }
 
 function Write-JsonAtomic {
