@@ -22,9 +22,19 @@
 - 全量测试在初次实现时为 52/52 通过。
 - 手工发送命令返回成功。
 - 用户确认个人微信实际收到测试模板消息。
+- 2026-07-28 生产 adapter 已切换为本契约，用户随后确认个人微信连续收到两条“Codex 通知”。
+- 切换后状态命令显示 `Transport: WeChat Official Account test account`、`Pending: 0`、`Delivered: 40`、`Failed: 2`。
+- watcher PID `24468`、生命周期 supervisor PID `25548`，唯一计划任务 `CodexWeChatNotifierLifecycle` 为运行状态；PID 仅是当次现场快照，不作为长期配置。
+- 两条 failed 是切换前已耗尽重试次数的旧 iLink 记录，并非测试号 adapter 返回失败；未读取其正文。
 
 ## 尚未证明
 
-- 生产 watcher 尚未切换，当前生产仍是直接 iLink。
 - 尚未验证 2400 字符完整输出、API 错误通知、用户中断通知和微信接口离线后的 outbox 恢复。
 - 测试号接口的长期平台政策和配额仍由微信官方控制，不能宣称永久不变。
+
+## 生产选择与回滚
+
+- 当前选择器：`%LOCALAPPDATA%\CodexWeChatNotifier\secure\active-transport.json`，值为 `wechat-test-account`，不含四项凭据。
+- 切换测试号：`use-wechat-test-account.cmd`。
+- 回滚直接 iLink：`use-ilink.cmd`。
+- iLink DPAPI 配置继续保留；切换 transport 不需要 OpenClaw、Gateway、代理或重复扫码。

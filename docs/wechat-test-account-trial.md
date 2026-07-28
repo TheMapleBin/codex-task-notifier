@@ -1,6 +1,6 @@
-# 微信公众号测试号试验
+# 微信公众号测试号接入
 
-该路径用于验证微信官方模板消息能否替代存在激活窗口的 iLink。当前仅为独立试验，不接管生产 watcher，不修改 iLink 配置、outbox、生命周期计划任务或 Codex 全局配置。
+该路径已于 2026-07-28 从独立试验升级为生产 transport，用微信官方模板消息替代存在激活窗口的 iLink。切换不修改 outbox、生命周期计划任务或 Codex 全局配置，原 iLink DPAPI 配置保留用于回滚。
 
 ## 平台配置
 
@@ -24,6 +24,7 @@
 ## 阶段门禁
 
 - 2026-07-28 16:36:24（Asia/Shanghai），微信官方发送命令返回成功，用户随后确认个人微信实际收到“微信公众号测试号链路测试”。
-- 该证据验证了 `AppID/AppSecret -> access_token -> template/send -> OpenID` 的短消息链路，不代表生产 watcher 已切换。
+- 该证据验证了 `AppID/AppSecret -> access_token -> template/send -> OpenID` 的短消息链路。
 - 首次实发使用短消息；完整 2400 字输出、错误通知和离线重试需另行验收。
-- 生产切换前必须重新执行 GitNexus impact，并保留 iLink 配置作为可回滚路径。
+- 生产切换已完成，用户确认个人微信连续收到两条“Codex 通知”。现场状态为 `Pending 0 / Delivered 40 / Failed 2`。
+- iLink 配置继续保留为可回滚路径；两条 failed 是切换前已耗尽尝试次数的旧记录，未经授权不得读取、重放或删除。

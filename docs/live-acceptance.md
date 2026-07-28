@@ -7,6 +7,7 @@
 | 用例 | 捕获 | outbox | 发送 | 微信确认 | 说明 |
 | --- | --- | --- | --- | --- | --- |
 | Codex Desktop 正常完成（直接 iLink） | 通过 | 通过 | 通过 | 通过 | 两条 pending 转 delivered，用户确认收到；其中一条包含最终输出 |
+| Codex 正常完成（微信公众号测试号生产路径） | 通过 | 通过 | 通过 | 通过 | 用户确认连续收到两条“Codex 通知”；现场计数 Pending 0 / Delivered 40 / Failed 2 |
 
 直接 iLink 验收期间未修改 `C:\Users\TheMapleBin\.codex\config.toml`、`base_url` 或 `15722`。
 
@@ -21,6 +22,8 @@
 | 用户中断 | 未验收 |
 | 微信暂时离线后恢复 | 未验收 |
 
-当前允许一个直接 iLink watcher，以及唯一的 `CodexWeChatNotifierLifecycle` 生命周期计划任务；不得启用代理、hook、wrapper、第二个 watcher、服务或其他计划任务。
+当前允许一个 watcher，生产 transport 为微信公众号测试号，以及唯一的 `CodexWeChatNotifierLifecycle` 生命周期计划任务；不得启用代理、hook、wrapper、第二个 watcher、服务或其他计划任务。直接 iLink 配置只作为回滚保留。
+
+两条 failed 是切换前已经耗尽最大尝试次数的旧 iLink 记录，outbox 在调用测试号 adapter 前即将其移入 failed。它们不构成测试号发送失败证据；未经用户明确授权，不读取正文、不重放、不删除。
 
 稳定 UIN、更新游标和最新 context 已使用 DPAPI 整体加密持久化。完整停止 PID `23684`、启动 PID `25248` 后，未重新绑定即成功发送“重启免绑定复测”，用户确认微信实际收到。基于该证据，生命周期恢复为轻量 supervisor 跟随 `codex.exe`：任一 Desktop/CLI 运行时启动 watcher，全部退出 30 秒后停止。整机冷启动仍未实际关机验收。
