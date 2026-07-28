@@ -15,6 +15,7 @@ Codex rollout JSONL -> watcher -> durable outbox -> WeChat iLink
 - 当前轻量 watcher 已配置；是否运行以 `notifier-status.cmd` 的实时结果为准。
 - 自动化验证为 52/52，覆盖直接 iLink、微信公众号测试号试验 adapter、DPAPI 配置、加密会话恢复、outbox 重试、终态识别、子代理过滤、跟随 Codex 的生命周期、待发终态合并、敏感信息净化、残缺/转义内部元数据、尾部 Codex UI 指令清理和安全任务名称。
 - 尚未完成：Desktop/API 可控错误、CLI 非零/API 错误、用户中断、微信离线后恢复的全部真实验收。
+- 微信公众号测试号短模板消息已完成一次官方命令成功和用户收件确认；它仍是独立试验路径，生产 watcher 尚未切换。
 - 从未启用：`15722`、`base_url` 切换、Stop hook、生产 CLI wrapper 或新服务。唯一计划任务在用户登录时启动轻量 supervisor；watcher 只在 Codex Desktop/CLI 运行时存在。
 
 通知包含来源、项目、任务名称、状态、耗时、短任务 ID、净化错误类别/HTTP 状态和最后一条 assistant 输出。输出最多 2400 字符；完整、残缺或 HTML 转义的内部 citation/rollout 元数据，以及末尾独立行中的 `::git-commit`、`::created-thread`、`::code-comment` 会在截断前移除。正文中的普通 `::` 保留，明显 token、Cookie、认证头、密码和 secret 会被遮盖。
@@ -47,4 +48,4 @@ npm run check
 npm test
 ```
 
-接手前阅读 [实施计划](docs/implementation-plan.md)、[交接说明](docs/claude-handoff.md)、[直连契约](docs/verified-ilink-contract.md)、[现场验收](docs/live-acceptance.md) 和 [受控接入](docs/codex-setup.md)。
+接手前阅读 [实施计划](docs/implementation-plan.md)、[交接说明](docs/claude-handoff.md)、[iLink 直连契约](docs/verified-ilink-contract.md)、[测试号契约](docs/verified-wechat-test-account-contract.md)、[现场验收](docs/live-acceptance.md) 和 [受控接入](docs/codex-setup.md)。

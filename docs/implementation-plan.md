@@ -25,6 +25,7 @@ Codex Desktop/CLI rollout JSONL
 | 安全任务名称 | 已实现；显式名称优先，prompt 副本被拒绝 |
 | API 错误、中断、离线恢复 | 尚未完成真实验收 |
 | iLink context 恢复 | DPAPI 会话恢复已通过进程重启真实验收；整机冷启动尚未验收 |
+| 微信公众号测试号替代路径 | 短模板消息已完成官方命令成功和用户收件确认；尚未接管生产 watcher |
 
 ## 不可跨越的边界
 
@@ -35,6 +36,7 @@ Codex Desktop/CLI rollout JSONL
 
 ## 下一步
 
-1. 验收 CLI 非零/错误和用户中断。
-2. 寻找安全的 Desktop API 错误复现；找不到则保留未验收状态。
-3. 验证 iLink 失败时 pending 会在恢复后 delivered，并由用户确认收到。
+1. 由用户明确决定是否将生产 adapter 从 iLink 切换到已验证的微信公众号测试号路径。
+2. 若切换，先重新执行 GitNexus impact，保留 iLink DPAPI 配置作为回滚路径，再验收 2400 字输出和 outbox 离线恢复。
+3. 验收 CLI 非零/错误和用户中断。
+4. 寻找安全的 Desktop API 错误复现；找不到则保留未验收状态。

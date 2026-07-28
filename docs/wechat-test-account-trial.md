@@ -23,6 +23,7 @@
 
 ## 阶段门禁
 
-- 真实收到前，不修改生产 adapter 选择逻辑。
+- 2026-07-28 16:36:24（Asia/Shanghai），微信官方发送命令返回成功，用户随后确认个人微信实际收到“微信公众号测试号链路测试”。
+- 该证据验证了 `AppID/AppSecret -> access_token -> template/send -> OpenID` 的短消息链路，不代表生产 watcher 已切换。
 - 首次实发使用短消息；完整 2400 字输出、错误通知和离线重试需另行验收。
 - 生产切换前必须重新执行 GitNexus impact，并保留 iLink 配置作为可回滚路径。
