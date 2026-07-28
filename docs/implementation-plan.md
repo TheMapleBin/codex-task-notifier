@@ -21,7 +21,7 @@ Codex Desktop/CLI rollout JSONL
 | watcher/outbox/iLink adapter | 完成；软件测试通过 |
 | Desktop/CLI 生命周期 | 完成；一个登录 supervisor 按 `codex.exe` 启停唯一 watcher |
 | 正常完成真实投递 | 完成；用户确认收到两条通知 |
-| 内部 citation 清理 | 已修复并测试；等待下一条真实消息复验 |
+| 内部 citation 清理 | 已修复并完成真实微信复验；2400 字符输出完整且无内部尾块 |
 | 安全任务名称 | 已实现；显式名称优先，prompt 副本被拒绝 |
 | API 错误、中断、离线恢复 | 尚未完成真实验收 |
 
@@ -34,7 +34,6 @@ Codex Desktop/CLI rollout JSONL
 
 ## 下一步
 
-1. 用下一条真实任务完成通知确认 citation 已消失、名称行符合规则。
-2. 验收 CLI 非零/错误和用户中断。
-3. 寻找安全的 Desktop API 错误复现；找不到则保留未验收状态。
-4. 验证 iLink 失败时 pending 会在恢复后 delivered，并由用户确认收到。
+1. 验收 CLI 非零/错误和用户中断。
+2. 寻找安全的 Desktop API 错误复现；找不到则保留未验收状态。
+3. 验证 iLink 失败时 pending 会在恢复后 delivered，并由用户确认收到。

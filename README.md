@@ -11,6 +11,7 @@ Codex rollout JSONL -> watcher -> durable outbox -> WeChat iLink
 ## 当前状态
 
 - 2026-07-28 已完成直接 iLink 真实验收：两个已捕获事件从 `pending` 进入 `delivered`，收件人确认微信实际收到，且通知包含最终 assistant 输出。
+- 2026-07-28 已完成 2400 字符输出与尾部净化复验：收件人确认通知内容完整，且末尾没有 citation/rollout 内部元数据。
 - 当前轻量 watcher 已配置；是否运行以 `notifier-status.cmd` 的实时结果为准。
 - 自动化验证为 41/41，覆盖直接 iLink、DPAPI 配置、outbox 重试、终态识别、子代理过滤、生命周期切换、敏感信息净化、残缺/转义内部元数据清理和安全任务名称。
 - 尚未完成：Desktop/API 可控错误、CLI 非零/API 错误、用户中断、微信离线后恢复的全部真实验收。

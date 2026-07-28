@@ -11,7 +11,7 @@
 - 自动模式只允许计划任务 `CodexWeChatNotifierLifecycle`；不得创建第二个生命周期任务或 watcher。
 - 不读取或发送用户 prompt、用户消息、完整会话、源码、原始请求/响应正文。
 - 任务名称优先使用 `threads.name`，否则使用 Codex UI 的 `threads.title`，并进行限长和敏感值净化。
-- 最终输出移除内部 citation 块并进行凭据净化，最多 1200 字符。
+- 最终输出在截断前移除完整、残缺和 HTML 转义的 citation/rollout 内部元数据并进行凭据净化，最多 2400 字符；真实微信复验已确认内容完整且无内部尾块。
 - 只允许一个 watcher。`npm run watch` 与 `start-notifier.cmd` 不得同时运行。
 
 日常建议运行一次 `enable-auto-notifier.cmd`，之后无需手工启动。手工入口仍保留为 `start-notifier.cmd`、`notifier-status.cmd` 和 `stop-notifier.cmd`。
