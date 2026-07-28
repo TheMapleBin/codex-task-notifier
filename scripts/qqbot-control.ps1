@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Configure', 'Bind', 'Status', 'Test')]
+    [ValidateSet('Configure', 'Bind', 'Status', 'Test', 'StartGateway', 'StopGateway', 'GatewayStatus')]
     [string]$Action
 )
 
@@ -19,6 +19,12 @@ function Get-Paths {
     [pscustomobject]@{
         SecureDirectory = Join-Path $root 'secure'
         ConfigPath = Join-Path $root 'secure\qqbot.dpapi.json'
+        RunDirectory = Join-Path $root 'run'
+        LogDirectory = Join-Path $root 'logs'
+        GatewayPidPath = Join-Path $root 'run\qqbot-gateway.pid.json'
+        GatewayStatusPath = Join-Path $root 'run\qqbot-gateway-status.json'
+        GatewayStdoutPath = Join-Path $root 'logs\qqbot-gateway.out.log'
+        GatewayStderrPath = Join-Path $root 'logs\qqbot-gateway.err.log'
     }
 }
 
@@ -197,6 +203,26 @@ function Get-Config {
     $config
 }
 
+function Get-GatewayProcess {
+    param(
+        [Parameter(Mandatory = $true)][object]$Paths,
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot
+    )
+    if (-not (Test-Path -LiteralPath $Paths.GatewayPidPath)) { return $null }
+    try {
+        $record = Get-Content -LiteralPath $Paths.GatewayPidPath -Raw | ConvertFrom-Json
+        if ($null -eq $record.pid) { throw 'invalid' }
+        $process = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$record.pid)" -ErrorAction SilentlyContinue
+        if ($null -eq $process) { throw 'stale' }
+        $expectedScript = Join-Path $RepositoryRoot 'src\qqbot-gateway-cli.mjs'
+        if ([string]$process.CommandLine -notlike "*$expectedScript*") { throw 'unexpected' }
+        $process
+    } catch {
+        Remove-Item -LiteralPath $Paths.GatewayPidPath -Force -ErrorAction SilentlyContinue
+        $null
+    }
+}
+
 function Invoke-Test {
     param([Parameter(Mandatory = $true)][object]$Paths, [Parameter(Mandatory = $true)][string]$RepositoryRoot)
     $config = Get-Config -Paths $Paths
@@ -258,10 +284,97 @@ function Invoke-Test {
     }
 }
 
+function Invoke-StartGateway {
+    param([Parameter(Mandatory = $true)][object]$Paths, [Parameter(Mandatory = $true)][string]$RepositoryRoot)
+    $null = Get-Config -Paths $Paths
+    $running = Get-GatewayProcess -Paths $Paths -RepositoryRoot $RepositoryRoot
+    if ($null -ne $running) {
+        Write-Host "QQ Bot Gateway is already running (PID $($running.ProcessId))."
+        return
+    }
+    $node = Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1
+    $gatewayPath = Join-Path $RepositoryRoot 'src\qqbot-gateway-cli.mjs'
+    if (-not (Test-Path -LiteralPath $gatewayPath)) { throw 'QQ Bot Gateway runtime was not found.' }
+    Set-PrivateDirectoryAcl -Path $Paths.RunDirectory
+    [System.IO.Directory]::CreateDirectory($Paths.LogDirectory) | Out-Null
+    $arguments = @(
+        ('"{0}"' -f $gatewayPath.Replace('"', '\"')),
+        '--config-path',
+        ('"{0}"' -f $Paths.ConfigPath.Replace('"', '\"')),
+        '--status-path',
+        ('"{0}"' -f $Paths.GatewayStatusPath.Replace('"', '\"'))
+    )
+    $process = Start-Process -FilePath $node.Source -ArgumentList $arguments -WorkingDirectory $RepositoryRoot -WindowStyle Hidden -RedirectStandardOutput $Paths.GatewayStdoutPath -RedirectStandardError $Paths.GatewayStderrPath -PassThru
+    Start-Sleep -Milliseconds 750
+    $process.Refresh()
+    if ($process.HasExited) { throw 'QQ Bot Gateway exited during startup. Check its sanitized status.' }
+    Write-JsonAtomic -Path $Paths.GatewayPidPath -Value ([ordered]@{
+        schemaVersion = 1
+        pid = $process.Id
+        startedAt = [DateTime]::UtcNow.ToString('o')
+        repositoryRoot = $RepositoryRoot
+    })
+    Write-Host "QQ Bot Gateway started (PID $($process.Id))."
+}
+
+function Invoke-StopGateway {
+    param([Parameter(Mandatory = $true)][object]$Paths, [Parameter(Mandatory = $true)][string]$RepositoryRoot)
+    $process = Get-GatewayProcess -Paths $Paths -RepositoryRoot $RepositoryRoot
+    if ($null -eq $process) {
+        Write-Host 'QQ Bot Gateway is not running.'
+        return
+    }
+    Stop-Process -Id $process.ProcessId -Force
+    Remove-Item -LiteralPath $Paths.GatewayPidPath -Force -ErrorAction SilentlyContinue
+    $activeMessages = 'unknown'
+    try {
+        if (Test-Path -LiteralPath $Paths.GatewayStatusPath) {
+            $previous = Get-Content -LiteralPath $Paths.GatewayStatusPath -Raw | ConvertFrom-Json
+            if ($previous.activeMessaging -in @('unknown', 'allowed', 'rejected')) { $activeMessages = [string]$previous.activeMessaging }
+        }
+    } catch { $activeMessages = 'unknown' }
+    Write-JsonAtomic -Path $Paths.GatewayStatusPath -Value ([ordered]@{
+        schemaVersion = 1
+        state = 'stopped'
+        activeMessaging = $activeMessages
+        updatedAt = [DateTime]::UtcNow.ToString('o')
+        code = $null
+    })
+    Write-Host 'QQ Bot Gateway stopped.'
+}
+
+function Invoke-GatewayStatus {
+    param([Parameter(Mandatory = $true)][object]$Paths, [Parameter(Mandatory = $true)][string]$RepositoryRoot)
+    $running = Get-GatewayProcess -Paths $Paths -RepositoryRoot $RepositoryRoot
+    Write-Host "Configured: $(if (Test-Path -LiteralPath $Paths.ConfigPath) { 'yes' } else { 'no' })"
+    Write-Host "Running: $(if ($null -ne $running) { 'yes' } else { 'no' })"
+    if ($null -ne $running) { Write-Host "PID: $($running.ProcessId)" }
+    $status = $null
+    try {
+        if (Test-Path -LiteralPath $Paths.GatewayStatusPath) {
+            $candidate = Get-Content -LiteralPath $Paths.GatewayStatusPath -Raw | ConvertFrom-Json
+            if ($candidate.schemaVersion -eq 1 -and $candidate.state -in @('starting', 'connecting', 'online', 'backoff', 'blocked', 'stopped') -and $candidate.activeMessaging -in @('unknown', 'allowed', 'rejected') -and $candidate.updatedAt) {
+                $status = $candidate
+            }
+        }
+    } catch { $status = $null }
+    if ($null -eq $status) {
+        Write-Host 'Gateway state: not reported'
+        return
+    }
+    Write-Host "Gateway state: $($status.state)"
+    Write-Host "Active messages: $($status.activeMessaging)"
+    Write-Host "Last update: $($status.updatedAt)"
+    if ($status.code -and [string]$status.code -match '^QQBOT_GATEWAY_[A-Z0-9_]{1,64}$') {
+        Write-Host "Last code: $($status.code)"
+    }
+}
+
 function Invoke-Status {
     param([Parameter(Mandatory = $true)][object]$Paths)
     Write-Host "Configured: $(if (Test-Path -LiteralPath $Paths.ConfigPath) { 'yes' } else { 'no' })"
-    Write-Host 'Transport: direct QQ Bot HTTPS adapter (no OpenClaw or Gateway)'
+    Write-Host 'Transport: direct QQ Bot HTTPS adapter (no OpenClaw)'
+    Write-Host 'Gateway presence: use qqbot-gateway-status.cmd'
     Write-Host 'Production watcher: unchanged'
 }
 
@@ -273,6 +386,9 @@ try {
         'Bind' { Invoke-Bind -Paths $paths -RepositoryRoot $repositoryRoot }
         'Status' { Invoke-Status -Paths $paths }
         'Test' { Invoke-Test -Paths $paths -RepositoryRoot $repositoryRoot }
+        'StartGateway' { Invoke-StartGateway -Paths $paths -RepositoryRoot $repositoryRoot }
+        'StopGateway' { Invoke-StopGateway -Paths $paths -RepositoryRoot $repositoryRoot }
+        'GatewayStatus' { Invoke-GatewayStatus -Paths $paths -RepositoryRoot $repositoryRoot }
     }
 } catch {
     [Console]::Error.WriteLine("QQ Bot control failed: $($_.Exception.Message)")

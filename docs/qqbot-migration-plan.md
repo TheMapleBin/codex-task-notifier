@@ -2,7 +2,7 @@
 
 ## 已确认的路线
 
-Codex 通知将使用仓库内的 QQ Bot HTTPS adapter，不安装、不启动、也不依赖 OpenClaw 或其 Gateway。现有微信 iLink 路线继续作为生产回滚，直到 QQ 的真实现场验收完成。
+Codex 通知将使用仓库内的 QQ Bot HTTPS adapter，并由一个原生、最小的 QQ WebSocket Gateway 在线守护保持机器人可用。不安装、不启动、也不依赖 OpenClaw 或其 Gateway。现有微信 iLink 路线继续作为生产回滚，直到 QQ 的真实现场验收完成。
 
 ```text
 Codex Desktop / CLI rollout JSONL
@@ -10,15 +10,19 @@ Codex Desktop / CLI rollout JSONL
   -> 现有持久 outbox
   -> 直接 QQ Bot HTTPS adapter
   -> QQ C2C 主动文本消息
+
+原生 QQ Gateway 在线守护
+  -> 官方 WebSocket 心跳 / 重连
+  -> 仅记录主动消息允许或拒绝状态
 ```
 
-首次取得用户 `openid` 时，才需要短暂运行一次独立的 QQ Gateway 绑定器；它不是日常 watcher 的依赖，也不需要 OpenClaw。绑定后 `openid` 会和 AppID/AppSecret 一起 DPAPI 加密，日常投递只使用 HTTPS。
+首次取得用户 `openid` 时，需要短暂运行一次独立的 QQ Gateway 绑定器；绑定后 `openid` 会和 AppID/AppSecret 一起 DPAPI 加密。日常投递仍只使用 HTTPS，但 QQ 平台要求机器人保持 Gateway 在线，因此另有一个不含 OpenClaw 的原生 Gateway 守护进程。它不读取或持久化聊天正文、OpenID、token 或原始事件。
 
 ## 当前边界
 
 - 当前生产 transport 仍为直接微信 iLink；本计划尚未授权切换它。
 - 不删除 iLink、微信公众号测试号配置、已有 DPAPI 状态、旧 outbox 记录或用户已有脏工作树修改。
-- 不修改 `C:\Users\TheMapleBin\.codex\config.toml`、`base_url`、`15722`，不新增 watcher、服务、代理、hook 或计划任务。
+- 不修改 `C:\Users\TheMapleBin\.codex\config.toml`、`base_url`、`15722`，不新增 watcher、代理、hook 或计划任务。原生 QQ Gateway 是单独、可显式启动和停止的轻量在线进程，尚未接入生产生命周期。
 - 不读取、输出、提交或写日志记录 AppSecret、access token、openid、二维码凭据、消息正文或原始请求/响应正文。
 - 不通知子代理；沿用现有根任务过滤、去重、任务名称解析、2400 字输出上限和末尾元数据净化。
 - HTTP 成功、SDK 返回、outbox `delivered` 或进程运行都不能单独证明 QQ 客户端实际收到；必须由收件人确认。
@@ -40,12 +44,14 @@ QQ 平台仍可能存在额度或频率限制，无法从 SDK 推导固定的全
 
 - `src/adapters/qqbot.mjs`：原生 `fetch` 的 C2C 主动消息 adapter；无 npm 运行依赖、无 OpenClaw 子进程。
 - `src/qqbot-config.mjs` 与 `scripts/qqbot-config.ps1`：只从当前 Windows 用户 DPAPI 读取 AppID、AppSecret、openid。
-- `bind-qqbot.cmd`：一次性原生 QQ Gateway 绑定器，收到一条 C2C 消息后直接 DPAPI 加密保存 OpenID 并退出；不常驻、不使用 OpenClaw。
+- `bind-qqbot.cmd`：一次性原生 QQ Gateway 绑定器，收到一条 C2C 消息后直接 DPAPI 加密保存 OpenID 并退出；不使用 OpenClaw。
 - `configure-qqbot.cmd`、`qqbot-status.cmd`、`test-qqbot.cmd`：手工配置、只读状态、一次短消息 smoke test；均不改当前生产 transport。
+- `start-qqbot-gateway.cmd`、`stop-qqbot-gateway.cmd`、`qqbot-gateway-status.cmd`：原生 Gateway 的显式启动、停止和脱敏状态查看；它们不启动 watcher，也不会改变生产 transport。
+- `src/qqbot-gateway.mjs`：官方 Gateway Identify、heartbeat、指数退避重连和 `C2C_MSG_RECEIVE` / `C2C_MSG_REJECT` 脱敏状态记录。
 - token 缓存、401 刷新一次、超时、离线、429 Retry-After、不可重试拒绝和敏感信息不外泄的单元测试。
 - outbox 新增 `retryable=false` 和 `retryAfterMs` 的受限处理；既有 iLink context 过期路径不变。
 
-仍未完成：真实 QQ 绑定、真实 C2C 实发、重启后复测、watcher 实发和生产切换。没有这些现场证据前，不能宣称 QQ 已接入生产。
+仍未完成：真实 QQ Gateway 在线、真实 C2C 实发、重启后复测、watcher 实发和生产切换。没有这些现场证据前，不能宣称 QQ 已接入生产。
 
 ## 后续阶段与门禁
 
@@ -60,12 +66,14 @@ QQ 平台仍可能存在额度或频率限制，无法从 SDK 推导固定的全
 
 ### 阶段 2：最小真实 QQ 主动发送
 
-1. 运行 `test-qqbot.cmd` 发送“Codex QQ 通知链路测试 + 时间戳”。
-2. 记录仅含 transport、退出状态和脱敏错误类别的本机证据；不打印 token/openid/正文/原始响应。
-3. 等待用户确认 QQ 客户端实际收到。
-4. 停止并重新运行 smoke test；不重新发送“绑定”，再次等待用户确认。
+1. 运行 `start-qqbot-gateway.cmd`，并用 `qqbot-gateway-status.cmd` 确认 `Running: yes` 与 `Gateway state: online`。
+2. 若在 Gateway 启动前已开启“主动消息”，状态可能是 `unknown`；这是未观察到历史事件，不是权限失败。可在 Gateway 在线时关闭再开启一次以得到 `allowed`，无需重新绑定。
+3. 运行 `test-qqbot.cmd` 发送“Codex QQ 通知链路测试 + 时间戳”。
+4. 记录仅含 transport、退出状态和脱敏错误类别的本机证据；不打印 token/openid/正文/原始响应。
+5. 等待用户确认 QQ 客户端实际收到。
+6. 停止并重新运行 Gateway 与 smoke test；不重新发送“绑定”，再次等待用户确认。
 
-**门禁：** 两次发送命令成功、两次客户端收件确认、且重启无需重新绑定。任一项失败则继续使用 iLink。
+**门禁：** Gateway 两次在线、两次发送命令成功、两次客户端收件确认、且重启无需重新绑定。任一项失败则继续使用 iLink。
 
 ### 阶段 3：受控 watcher 验收
 

@@ -17,8 +17,8 @@ Codex rollout JSONL -> watcher -> durable outbox -> WeChat iLink
 - 自动化验证覆盖直接 iLink、微信公众号测试号备用 adapter、DPAPI 配置、加密会话恢复、ClawBot 心跳、outbox 重试、终态识别、子代理过滤、跟随 Codex 的生命周期、待发终态合并、敏感信息净化、残缺/转义内部元数据、尾部 Codex UI 指令清理和安全任务名称。
 - 尚未完成：Desktop/API 可控错误、CLI 非零/API 错误、用户中断、微信离线后恢复的全部真实验收。
 - 微信公众号测试号 DPAPI 配置保留为备用；当前 iLink 路径不需要 OpenClaw 或 `account/target`。
-- 从未启用：OpenClaw、Gateway、`15722`、`base_url` 切换、Stop hook、生产 CLI wrapper 或新服务。唯一计划任务在用户登录时启动轻量 supervisor；watcher 只在 Codex Desktop/CLI 运行时存在。supervisor 每 30 秒执行一次 ClawBot `typing` 后立即 `cancel`，不保持可见的“正在输入”。
-- QQ Bot 直连 adapter 已完成本地实现和单元测试：日常投递只用 QQ HTTPS API，不依赖 OpenClaw 或 Gateway；当前未配置、未现场实发、未切换生产。完整门禁见 [QQ Bot 直连迁移计划](docs/qqbot-migration-plan.md)。
+- 从未启用：OpenClaw（及其 Gateway）、`15722`、`base_url` 切换、Stop hook、生产 CLI wrapper 或新服务。唯一计划任务在用户登录时启动轻量 supervisor；watcher 只在 Codex Desktop/CLI 运行时存在。supervisor 每 30 秒执行一次 ClawBot `typing` 后立即 `cancel`，不保持可见的“正在输入”。
+- QQ Bot 直连 adapter 与最小原生 Gateway 在线守护已完成本地实现和单元测试：日常投递只用 QQ HTTPS API，Gateway 只维持官方 WebSocket 在线、心跳/重连与脱敏权限状态；不依赖 OpenClaw。当前未切换生产。完整门禁见 [QQ Bot 直连迁移计划](docs/qqbot-migration-plan.md) 和 [原生 Gateway 操作说明](docs/qqbot-native-gateway.md)。
 - ClawBot 保活已通过短窗口真实验收：未重新发送“绑定”，连续保活约 4 分钟后主动发送成功，用户确认微信实际收到。整机冷启动和更长周期仍需后续观察。
 
 通知包含来源、项目、任务名称、状态、耗时、短任务 ID、净化错误类别/HTTP 状态和最后一条 assistant 输出。输出最多 2400 字符；完整、残缺或 HTML 转义的内部 citation/rollout 元数据，以及末尾独立行中的 `::git-commit`、`::created-thread`、`::code-comment` 会在截断前移除。正文中的普通 `::` 保留，明显 token、Cookie、认证头、密码和 secret 会被遮盖。
@@ -38,7 +38,7 @@ Codex rollout JSONL -> watcher -> durable outbox -> WeChat iLink
 - `auto-notifier-status.cmd`：查看自动模式、supervisor 和计划任务状态。
 - `disable-auto-notifier.cmd`：移除自动模式并停止 supervisor 与 watcher。
 
-QQ Bot 使用 `bind-qqbot.cmd` 完成一次性绑定：它只在本次操作中短暂连接官方 QQ Gateway，等你向机器人发“绑定”后立即将 OpenID 加密保存并退出。无法绑定时也可用 `configure-qqbot.cmd` 手工加密配置；`qqbot-status.cmd` 查看是否已配置，`test-qqbot.cmd` 做一次独立短消息实发。它们都不会改变当前 iLink 生产 transport。不得在未经现场验收和明确确认的情况下手工把 watcher 切到 QQ。
+QQ Bot 使用 `bind-qqbot.cmd` 完成一次性绑定：它只在本次操作中短暂连接官方 QQ Gateway，等你向机器人发“绑定”后立即将 OpenID 加密保存并退出。无法绑定时也可用 `configure-qqbot.cmd` 手工加密配置；`qqbot-status.cmd` 查看是否已配置，`start-qqbot-gateway.cmd` / `stop-qqbot-gateway.cmd` 显式管理最小原生在线连接，`qqbot-gateway-status.cmd` 查看其脱敏状态，`test-qqbot.cmd` 做一次独立短消息实发。它们都不会改变当前 iLink 生产 transport。不得在未经现场验收和明确确认的情况下手工把 watcher 切到 QQ。
 
 自动模式只新增一个当前用户登录计划任务和一个轻量 supervisor。Codex Desktop/CLI 任一运行时启动 watcher；全部退出 30 秒后停止 watcher。iLink 凭据和最新会话状态持久保存在 DPAPI 中；supervisor 在 watcher 停止期间用同一会话执行低占空比保活。`notifier-status.cmd` 会显示最近一次 `ClawBot keepalive` 状态。
 
