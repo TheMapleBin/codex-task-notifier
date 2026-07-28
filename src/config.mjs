@@ -59,6 +59,10 @@ function resolveDefaultStateDatabase(env) {
   return path.join(userProfile, ".codex", "state_5.sqlite");
 }
 
+function resolveDefaultWechatTestConfig(env) {
+  return path.join(resolveDefaultHome(env), "secure", "wechat-test-account.dpapi.json");
+}
+
 export function loadConfig(env = process.env) {
   const serviceHost = env.CODEX_NOTIFY_HOST || DEFAULT_SERVICE_HOST;
   if (!isLoopbackHost(serviceHost)) {
@@ -74,8 +78,8 @@ export function loadConfig(env = process.env) {
   }
 
   const adapter = env.CODEX_NOTIFY_ADAPTER || "dry-run";
-  if (!["dry-run", "ilink"].includes(adapter)) {
-    throw new Error("CODEX_NOTIFY_ADAPTER must be dry-run or ilink.");
+  if (!["dry-run", "ilink", "wechat-test-account"].includes(adapter)) {
+    throw new Error("CODEX_NOTIFY_ADAPTER must be dry-run, ilink, or wechat-test-account.");
   }
 
   const home = path.resolve(env.CODEX_NOTIFY_HOME || resolveDefaultHome(env));
@@ -126,6 +130,15 @@ export function loadConfig(env = process.env) {
         name: "CODEX_NOTIFY_ILINK_RETRY_MS"
       }),
       pollEnabled: booleanFromEnv(env.CODEX_NOTIFY_ILINK_POLL_ENABLED, true)
+    }),
+    wechatTestAccount: Object.freeze({
+      configPath: path.resolve(env.CODEX_NOTIFY_WECHAT_TEST_CONFIG || resolveDefaultWechatTestConfig(env)),
+      powershell: env.CODEX_NOTIFY_POWERSHELL || "pwsh.exe",
+      timeoutMs: integerFromEnv(env.CODEX_NOTIFY_WECHAT_TEST_TIMEOUT_MS, 30_000, {
+        min: 1_000,
+        max: 300_000,
+        name: "CODEX_NOTIFY_WECHAT_TEST_TIMEOUT_MS"
+      })
     }),
     retryBaseMs,
     retryMaxMs: integerFromEnv(env.CODEX_NOTIFY_RETRY_MAX_MS, 1_800_000, {

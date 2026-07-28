@@ -93,3 +93,42 @@ test("one-click control starts one isolated watcher without exposing protected v
   assert.equal(stopped.status, 0, stopped.stderr);
   assert.match(stopped.stdout, /Running: no/);
 });
+
+test("production control starts the watcher with protected WeChat test-account credentials", async () => {
+  const controlHome = await temporaryDirectory();
+  const sessionsDir = path.join(controlHome, "sessions");
+  const secureDirectory = path.join(controlHome, "secure");
+  await fs.mkdir(sessionsDir, { recursive: true });
+  await fs.mkdir(secureDirectory, { recursive: true });
+  const configPath = path.join(secureDirectory, "wechat-test-account.dpapi.json");
+  const selectorPath = path.join(secureDirectory, "active-transport.json");
+  const env = {
+    ...process.env,
+    CODEX_NOTIFY_CONTROL_HOME: controlHome,
+    CODEX_NOTIFY_SESSIONS_DIR: sessionsDir,
+    CODEX_NOTIFY_POLL_MS: "100"
+  };
+  const setup = spawnSync("powershell.exe", [
+    "-NoProfile",
+    "-Command",
+    "Add-Type -AssemblyName System.Security; function p([string]$v){$b=[Text.Encoding]::UTF8.GetBytes($v);$e=[Text.Encoding]::UTF8.GetBytes('CodexWeChatNotifier/v1');try{[Convert]::ToBase64String([Security.Cryptography.ProtectedData]::Protect($b,$e,[Security.Cryptography.DataProtectionScope]::CurrentUser))}finally{[Array]::Clear($b,0,$b.Length);[Array]::Clear($e,0,$e.Length)}}; @{schemaVersion=1;transport='wechat-test-account';appId=(p 'stored-app');appSecret=(p 'stored-secret');openId=(p 'stored-user');templateId=(p 'stored-template')} | ConvertTo-Json -Compress | Set-Content -LiteralPath $env:TEST_CONFIG -Encoding UTF8"
+  ], {
+    env: { ...env, TEST_CONFIG: configPath },
+    encoding: "utf8"
+  });
+  assert.equal(setup.status, 0, setup.stderr);
+  await fs.writeFile(selectorPath, JSON.stringify({ schemaVersion: 1, transport: "wechat-test-account" }));
+
+  try {
+    const started = runControl("Start", env);
+    assert.equal(started.status, 0, started.stderr);
+    assert.match(started.stdout, /Notifier started/);
+    assert.doesNotMatch(`${started.stdout}${started.stderr}`, /stored-app|stored-secret|stored-user|stored-template/);
+    const status = runControl("Status", env);
+    assert.equal(status.status, 0, status.stderr);
+    assert.match(status.stdout, /WeChat Official Account test account/);
+    assert.match(status.stdout, /Running: yes/);
+  } finally {
+    runControl("Stop", env);
+  }
+});

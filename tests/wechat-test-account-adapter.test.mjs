@@ -106,3 +106,25 @@ test("WeChat test-account adapter reports a sanitized timeout", async () => {
     (error) => error.message === "wechat_test_account_token_timeout"
   );
 });
+
+test("WeChat test-account adapter loads protected credentials during start", async () => {
+  let reads = 0;
+  const adapter = createWechatTestAccountAdapter({
+    wechatTestAccount: { configPath: "C:\\secure\\test.dpapi.json", timeoutMs: 1_000 }
+  }, {
+    credentialStore: { read: async () => {
+      reads += 1;
+      return { appId: "stored-app", appSecret: "stored-secret", openId: "stored-user", templateId: "stored-template" };
+    } },
+    fetchImpl: async (url, options) => {
+      if (String(url).includes("/cgi-bin/token")) return response({ access_token: "stored-token", expires_in: 7200 });
+      const body = JSON.parse(options.body);
+      assert.equal(body.touser, "stored-user");
+      assert.equal(body.template_id, "stored-template");
+      return response({ errcode: 0 });
+    }
+  });
+  await adapter.start();
+  await adapter.send(event);
+  assert.equal(reads, 1);
+});

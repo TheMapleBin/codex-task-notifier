@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Configure', 'Start', 'Stop', 'Status')]
+    [ValidateSet('Configure', 'Start', 'Stop', 'Status', 'UseTestAccount', 'UseIlink')]
     [string]$Action
 )
 
@@ -20,6 +20,8 @@ function Get-ControlPaths {
         Root = $root
         SecureDirectory = Join-Path $root 'secure'
         ConfigPath = Join-Path $root 'secure\weixin-ilink.dpapi.json'
+        TestAccountConfigPath = Join-Path $root 'secure\wechat-test-account.dpapi.json'
+        TransportPath = Join-Path $root 'secure\active-transport.json'
         RuntimeHome = Join-Path $root 'live'
         RunDirectory = Join-Path $root 'run'
         PidPath = Join-Path $root 'run\watcher.pid.json'
@@ -67,6 +69,33 @@ function Write-JsonAtomic {
 
 function Get-DpapiEntropy {
     [Text.Encoding]::UTF8.GetBytes('CodexWeChatNotifier/v1')
+}
+
+function Get-SelectedTransport {
+    param([Parameter(Mandatory = $true)][object]$Paths)
+    if (-not (Test-Path -LiteralPath $Paths.TransportPath)) { return 'weixin-ilink' }
+    try {
+        $selection = Get-Content -LiteralPath $Paths.TransportPath -Raw | ConvertFrom-Json
+        if ($selection.schemaVersion -ne 1 -or $selection.transport -notin @('weixin-ilink', 'wechat-test-account')) {
+            throw 'invalid'
+        }
+        [string]$selection.transport
+    } catch {
+        throw 'Notifier transport selection is invalid.'
+    }
+}
+
+function Set-SelectedTransport {
+    param(
+        [Parameter(Mandatory = $true)][object]$Paths,
+        [Parameter(Mandatory = $true)][ValidateSet('weixin-ilink', 'wechat-test-account')][string]$Transport
+    )
+    Set-PrivateDirectoryAcl -Path $Paths.SecureDirectory
+    Write-JsonAtomic -Path $Paths.TransportPath -Value ([ordered]@{
+        schemaVersion = 1
+        transport = $Transport
+        updatedAt = [DateTime]::UtcNow.ToString('o')
+    })
 }
 
 function Protect-SecureValue {
@@ -251,12 +280,23 @@ function Invoke-Start {
         Write-Host "Notifier is already running (PID $($running.ProcessId))."
         return
     }
-    if (-not (Test-Path -LiteralPath $Paths.ConfigPath)) {
-        throw 'Notifier is not configured. Run configure-notifier.cmd once.'
-    }
-    $config = Get-Content -LiteralPath $Paths.ConfigPath -Raw | ConvertFrom-Json
-    if ($config.schemaVersion -ne 2 -or $config.transport -ne 'weixin-ilink' -or -not $config.botToken -or -not $config.baseUrl -or -not $config.toUserId -or -not $config.contextToken) {
-        throw 'Notifier configuration is invalid. Run configure-notifier.cmd again.'
+    $transport = Get-SelectedTransport -Paths $Paths
+    if ($transport -eq 'wechat-test-account') {
+        if (-not (Test-Path -LiteralPath $Paths.TestAccountConfigPath)) {
+            throw 'WeChat test account is not configured. Run configure-wechat-test-account.cmd once.'
+        }
+        $config = Get-Content -LiteralPath $Paths.TestAccountConfigPath -Raw | ConvertFrom-Json
+        if ($config.schemaVersion -ne 1 -or $config.transport -ne 'wechat-test-account' -or -not $config.appId -or -not $config.appSecret -or -not $config.openId -or -not $config.templateId) {
+            throw 'WeChat test-account configuration is invalid.'
+        }
+    } else {
+        if (-not (Test-Path -LiteralPath $Paths.ConfigPath)) {
+            throw 'Notifier is not configured. Run configure-notifier.cmd once.'
+        }
+        $config = Get-Content -LiteralPath $Paths.ConfigPath -Raw | ConvertFrom-Json
+        if ($config.schemaVersion -ne 2 -or $config.transport -ne 'weixin-ilink' -or -not $config.botToken -or -not $config.baseUrl -or -not $config.toUserId -or -not $config.contextToken) {
+            throw 'Notifier configuration is invalid. Run configure-notifier.cmd again.'
+        }
     }
     $node = Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1
     $indexPath = Join-Path $RepositoryRoot 'src\index.mjs'
@@ -270,19 +310,38 @@ function Invoke-Start {
     $baseUrl = $null
     $toUserId = $null
     $contextToken = $null
-    $names = @('CODEX_NOTIFY_ADAPTER', 'CODEX_NOTIFY_ILINK_BOT_TOKEN', 'CODEX_NOTIFY_ILINK_BASE_URL', 'CODEX_NOTIFY_ILINK_TO_USER_ID', 'CODEX_NOTIFY_ILINK_CONTEXT_TOKEN', 'CODEX_NOTIFY_HOME')
+    $names = @(
+        'CODEX_NOTIFY_ADAPTER',
+        'CODEX_NOTIFY_ILINK_BOT_TOKEN',
+        'CODEX_NOTIFY_ILINK_BASE_URL',
+        'CODEX_NOTIFY_ILINK_TO_USER_ID',
+        'CODEX_NOTIFY_ILINK_CONTEXT_TOKEN',
+        'CODEX_NOTIFY_WECHAT_TEST_CONFIG',
+        'CODEX_NOTIFY_POWERSHELL',
+        'CODEX_NOTIFY_HOME'
+    )
     $previous = @{}
     foreach ($name in $names) { $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
     try {
-        $botToken = Unprotect-Value ([string]$config.botToken)
-        $baseUrl = Unprotect-Value ([string]$config.baseUrl)
-        $toUserId = Unprotect-Value ([string]$config.toUserId)
-        $contextToken = Unprotect-Value ([string]$config.contextToken)
-        $env:CODEX_NOTIFY_ADAPTER = 'ilink'
-        $env:CODEX_NOTIFY_ILINK_BOT_TOKEN = $botToken
-        $env:CODEX_NOTIFY_ILINK_BASE_URL = $baseUrl
-        $env:CODEX_NOTIFY_ILINK_TO_USER_ID = $toUserId
-        $env:CODEX_NOTIFY_ILINK_CONTEXT_TOKEN = $contextToken
+        if ($transport -eq 'wechat-test-account') {
+            $powerShellCommand = Get-Command pwsh.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($null -eq $powerShellCommand) {
+                $powerShellCommand = Get-Command powershell.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1
+            }
+            $env:CODEX_NOTIFY_ADAPTER = 'wechat-test-account'
+            $env:CODEX_NOTIFY_WECHAT_TEST_CONFIG = $Paths.TestAccountConfigPath
+            $env:CODEX_NOTIFY_POWERSHELL = $powerShellCommand.Source
+        } else {
+            $botToken = Unprotect-Value ([string]$config.botToken)
+            $baseUrl = Unprotect-Value ([string]$config.baseUrl)
+            $toUserId = Unprotect-Value ([string]$config.toUserId)
+            $contextToken = Unprotect-Value ([string]$config.contextToken)
+            $env:CODEX_NOTIFY_ADAPTER = 'ilink'
+            $env:CODEX_NOTIFY_ILINK_BOT_TOKEN = $botToken
+            $env:CODEX_NOTIFY_ILINK_BASE_URL = $baseUrl
+            $env:CODEX_NOTIFY_ILINK_TO_USER_ID = $toUserId
+            $env:CODEX_NOTIFY_ILINK_CONTEXT_TOKEN = $contextToken
+        }
         $env:CODEX_NOTIFY_HOME = $Paths.RuntimeHome
         $process = Start-Process -FilePath $node.Source -ArgumentList @($indexPath, 'watch') -WorkingDirectory $RepositoryRoot -WindowStyle Hidden -RedirectStandardOutput $Paths.StdoutPath -RedirectStandardError $Paths.StderrPath -PassThru
     } finally {
@@ -329,14 +388,38 @@ function Get-JsonCount {
     @(Get-ChildItem -LiteralPath $Path -File -Filter '*.json' -ErrorAction SilentlyContinue).Count
 }
 
+function Invoke-UseTestAccount {
+    param([Parameter(Mandatory = $true)][object]$Paths)
+    if (-not (Test-Path -LiteralPath $Paths.TestAccountConfigPath)) {
+        throw 'WeChat test account is not configured. Run configure-wechat-test-account.cmd once.'
+    }
+    Set-SelectedTransport -Paths $Paths -Transport 'wechat-test-account'
+    Write-Host 'Production transport selected: WeChat Official Account test account.'
+}
+
+function Invoke-UseIlink {
+    param([Parameter(Mandatory = $true)][object]$Paths)
+    if (-not (Test-Path -LiteralPath $Paths.ConfigPath)) {
+        throw 'Direct WeChat iLink is not configured.'
+    }
+    Set-SelectedTransport -Paths $Paths -Transport 'weixin-ilink'
+    Write-Host 'Production transport selected: direct WeChat iLink.'
+}
+
 function Invoke-Status {
     param(
         [Parameter(Mandatory = $true)][object]$Paths,
         [Parameter(Mandatory = $true)][string]$RepositoryRoot
     )
     $process = Get-WatcherProcess -Paths $Paths -RepositoryRoot $RepositoryRoot
-    Write-Host "Configured: $(if (Test-Path -LiteralPath $Paths.ConfigPath) { 'yes' } else { 'no' })"
-    if (Test-Path -LiteralPath $Paths.ConfigPath) { Write-Host 'Transport: direct WeChat iLink' }
+    $transport = Get-SelectedTransport -Paths $Paths
+    $configured = if ($transport -eq 'wechat-test-account') {
+        Test-Path -LiteralPath $Paths.TestAccountConfigPath
+    } else {
+        Test-Path -LiteralPath $Paths.ConfigPath
+    }
+    Write-Host "Configured: $(if ($configured) { 'yes' } else { 'no' })"
+    Write-Host "Transport: $(if ($transport -eq 'wechat-test-account') { 'WeChat Official Account test account' } else { 'direct WeChat iLink' })"
     Write-Host "Running: $(if ($null -ne $process) { 'yes' } else { 'no' })"
     if ($null -ne $process) { Write-Host "PID: $($process.ProcessId)" }
     Write-Host "Pending: $(Get-JsonCount (Join-Path $Paths.RuntimeHome 'outbox\pending'))"
@@ -354,6 +437,8 @@ try {
         'Start' { Invoke-Start -Paths $paths -RepositoryRoot $repositoryRoot }
         'Stop' { Invoke-Stop -Paths $paths -RepositoryRoot $repositoryRoot }
         'Status' { Invoke-Status -Paths $paths -RepositoryRoot $repositoryRoot }
+        'UseTestAccount' { Invoke-UseTestAccount -Paths $paths }
+        'UseIlink' { Invoke-UseIlink -Paths $paths }
     }
 } catch {
     [Console]::Error.WriteLine("Notifier control failed: $($_.Exception.Message)")
