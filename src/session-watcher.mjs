@@ -45,6 +45,15 @@ function assistantOutput(record) {
   return parts.length ? parts.join("\n") : null;
 }
 
+function isSubagentSession(payload) {
+  return Boolean(
+    payload?.parent_thread_id
+    || payload?.agent_path
+    || payload?.thread_source === "subagent"
+    || payload?.source?.subagent
+  );
+}
+
 function terminalEvent(record, state) {
   if (record?.type !== "event_msg" || !record.payload) return null;
   const payload = record.payload;
@@ -92,6 +101,7 @@ export function createSessionWatcher({ sessionsDir, onEvent, pollIntervalMs = 1_
   function updateContext(record, state) {
     if (record.type === "session_meta") {
       state.threadId = record.payload?.id || record.payload?.session_id || state.threadId;
+      state.subagent ||= isSubagentSession(record.payload);
     }
     const startedTurnId = record.type === "event_msg" && record.payload?.type === "task_started"
       ? record.payload?.turn_id || record.payload?.turnId

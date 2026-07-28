@@ -174,6 +174,34 @@ test("session watcher ignores subagent terminal events by default", async () => 
   assert.deepEqual(events, []);
 });
 
+test("session watcher ignores subagents identified by session metadata", async () => {
+  const root = await temporaryDirectory();
+  const directory = path.join(root, "2026", "07", "28");
+  await fs.mkdir(directory, { recursive: true });
+  const rollout = path.join(directory, "rollout-subagent-meta.jsonl");
+  const lines = [
+    JSON.stringify({
+      type: "session_meta",
+      payload: {
+        session_id: "root-thread",
+        id: "child-thread",
+        parent_thread_id: "root-thread",
+        source: { subagent: "reviewer" },
+        thread_source: "subagent",
+        agent_path: "/root/reviewer"
+      }
+    }),
+    JSON.stringify({ type: "turn_context", payload: { cwd: "C:\\work\\demo" } }),
+    JSON.stringify({ type: "event_msg", payload: { type: "task_complete", turn_id: "child-turn" } })
+  ];
+  await fs.writeFile(rollout, `${lines.join("\n")}\n`, "utf8");
+  const events = [];
+  const watcher = createSessionWatcher({ sessionsDir: root, onEvent: async (event) => events.push(event) });
+
+  assert.equal(await watcher.scanOnce(), 0);
+  assert.deepEqual(events, []);
+});
+
 test("session watcher baselines historical rollouts before observing appended terminal events", async () => {
   const root = await temporaryDirectory();
   const directory = path.join(root, "2026", "07", "27");
