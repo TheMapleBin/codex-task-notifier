@@ -174,7 +174,8 @@ export function createQQBotAdapter(config, {
         payload = await sendWithToken(token, event);
       }
       const messageId = typeof payload?.id === "string" && payload.id ? payload.id : null;
-      return { transport: "qqbot-direct", exitCode: 0, ...(messageId ? { messageId } : {}) };
+      if (!messageId) throw failure("QQBOT_SEND_PROTOCOL_ERROR");
+      return { transport: "qqbot-direct", exitCode: 0, messageId };
     }
   });
 }

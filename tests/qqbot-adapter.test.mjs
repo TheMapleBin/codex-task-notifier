@@ -57,6 +57,17 @@ test("direct QQ Bot adapter obtains a token and sends a proactive C2C text messa
   assert.equal(Object.hasOwn(body, "msg_id"), false);
 });
 
+test("direct QQ Bot adapter requires an API message-ID receipt", async () => {
+  const adapter = createQQBotAdapter(config(), { fetchImpl: async (url) => {
+    if (String(url).includes("/app/getAppAccessToken")) return response({ access_token: "token", expires_in: 7200 });
+    return response({ timestamp: "2026-07-28T23:30:00+08:00" });
+  }});
+  await assert.rejects(
+    () => adapter.send(event),
+    (error) => error.code === "QQBOT_SEND_PROTOCOL_ERROR" && error.retryable === true
+  );
+});
+
 test("direct QQ Bot adapter caches access tokens", async () => {
   let tokenRequests = 0;
   const adapter = createQQBotAdapter(config(), { fetchImpl: async (url) => {

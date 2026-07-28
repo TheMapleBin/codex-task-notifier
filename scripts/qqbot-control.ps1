@@ -249,8 +249,8 @@ function Invoke-Test {
         $process.WaitForExit()
         if ($process.ExitCode -ne 0) { throw $stderr.Trim() }
         $result = $stdout | ConvertFrom-Json
-        if (-not $result.ok -or $result.transport -ne 'qqbot-direct') { throw 'QQ Bot smoke test returned an invalid result.' }
-        Write-Host "QQ Bot direct send command succeeded at $timestamp."
+        if (-not $result.ok -or $result.transport -ne 'qqbot-direct' -or -not $result.messageIdReceipt) { throw 'QQ Bot smoke test did not receive a message-ID receipt.' }
+        Write-Host "QQ Bot API returned a message-ID receipt at $timestamp."
     } finally {
         $values = $null
         $payload = $null

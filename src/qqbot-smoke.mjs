@@ -11,7 +11,7 @@ try {
   const input = JSON.parse(await readStdin());
   const adapter = createQQBotAdapter(input.config);
   const result = await adapter.send(createEvent(input.event));
-  process.stdout.write(`${JSON.stringify({ ok: true, transport: result.transport })}\n`);
+  process.stdout.write(`${JSON.stringify({ ok: true, transport: result.transport, messageIdReceipt: Boolean(result.messageId) })}\n`);
 } catch (error) {
   process.stderr.write(`${String(error.message || error)}\n`);
   process.exitCode = 1;
