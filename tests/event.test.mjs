@@ -56,7 +56,7 @@ test("event contract sanitizes and truncates the final assistant output", () => 
     source: "session-watcher",
     kind: "turn_finished",
     turnId: "turn-output",
-    finalOutput: `第一行\r\nAuthorization: Bearer secret-value\napi_key=sk-1234567890abcdef\nCookie: session=private\u0000\n${"x".repeat(2_000)}`,
+    finalOutput: `第一行\r\nAuthorization: Bearer secret-value\napi_key=sk-1234567890abcdef\nCookie: session=private\u0000\n${"x".repeat(4_000)}`,
     prompt: "must not survive",
     responseBody: "must not survive either"
   });
@@ -83,6 +83,25 @@ test("event contract removes internal memory citations from final assistant outp
 
   assert.equal(event.finalOutput, "用户可见结论。");
   assert.doesNotMatch(formatEventForDelivery(event), /oai-mem-citation|MEMORY\.md|rollout_ids/);
+});
+
+test("event contract removes orphaned and escaped internal metadata tails before truncation", () => {
+  const orphaned = createEvent({
+    source: "session-watcher",
+    kind: "turn_finished",
+    turnId: "turn-orphaned-metadata",
+    finalOutput: `${"正文".repeat(1_000)}\n<citation_entries>\nMEMORY.md:1-2|note=[internal]\n</citation_entries>\n<rollout_ids>\ninternal-id`
+  });
+  assert.equal(orphaned.finalOutput, "正文".repeat(1_000));
+  assert.doesNotMatch(orphaned.finalOutput, /citation_entries|MEMORY\.md|rollout_ids|internal-id/);
+
+  const escaped = createEvent({
+    source: "session-watcher",
+    kind: "turn_finished",
+    turnId: "turn-escaped-metadata",
+    finalOutput: "用户可见。\n&lt;oai-mem-citation&gt;\n&lt;rollout_ids&gt;\ninternal-id"
+  });
+  assert.equal(escaped.finalOutput, "用户可见。");
 });
 
 test("event contract preserves unrelated XML-like text", () => {

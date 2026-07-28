@@ -28,7 +28,7 @@ const DEFAULT_SEVERITY = {
   delivery_error: "warning"
 };
 
-export const FINAL_OUTPUT_MAX_LENGTH = 1_200;
+export const FINAL_OUTPUT_MAX_LENGTH = 2_400;
 export const TASK_NAME_MAX_LENGTH = 120;
 
 function cleanText(value, maxLength) {
@@ -54,11 +54,31 @@ function redactSensitiveText(value) {
     );
 }
 
+function stripInternalMetadata(value) {
+  const withoutCompleteBlocks = String(value)
+    .replace(/<oai-mem-citation\b[^>]*>[\s\S]*?<\/oai-mem-citation\s*>/gi, "")
+    .replace(/&lt;oai-mem-citation\b[\s\S]*?&lt;\/oai-mem-citation\s*&gt;/gi, "");
+  const orphanMarkers = [
+    /<\s*oai-mem-citation\b/i,
+    /<\s*citation_entries\s*>/i,
+    /<\s*rollout_ids\s*>/i,
+    /&lt;\s*oai-mem-citation\b/i,
+    /&lt;\s*citation_entries\s*&gt;/i,
+    /&lt;\s*rollout_ids\s*&gt;/i,
+    /(?:^|\n)\s*MEMORY\.md:\d+(?:-\d+)?\|note=\[/im,
+    /(?:^|\n)\s*(?:citation_entries|rollout_ids)\s*:?[ \t]*(?:\n|$)/im
+  ];
+  let cutoff = withoutCompleteBlocks.length;
+  for (const marker of orphanMarkers) {
+    const match = marker.exec(withoutCompleteBlocks);
+    if (match && match.index < cutoff) cutoff = match.index;
+  }
+  return withoutCompleteBlocks.slice(0, cutoff);
+}
+
 function safeFinalOutput(value) {
   if (value == null) return null;
-  const withoutInternalMetadata = String(value)
-    .replace(/<oai-mem-citation\b[^>]*>[\s\S]*?<\/oai-mem-citation\s*>/gi, "")
-    .replace(/<oai-mem-citation\b[^>]*>[\s\S]*$/gi, "");
+  const withoutInternalMetadata = stripInternalMetadata(value);
   const normalized = redactSensitiveText(withoutInternalMetadata
     .replace(/\r\n?/g, "\n")
     .replace(/\t/g, "  ")
