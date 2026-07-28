@@ -3,20 +3,20 @@
 ## 当前事实
 
 - 当前生产路径是直接腾讯 iLink；微信公众号测试号配置保留为备用，不承载长正文生产通知。
-- 唯一 watcher 由 `start-notifier.cmd` 管理，并由登录计划任务中的轻量 supervisor 跟随 `codex.exe` 启停；全部 Codex 退出 30 秒后停止。先运行状态命令，不要启动第二个。
+- 唯一 watcher 由 `start-notifier.cmd` 管理，并由登录计划任务中的轻量 supervisor 跟随 `codex.exe` 启停；全部 Codex 退出 30 秒后停止。supervisor 本身继续每 30 秒执行一次 ClawBot `typing/cancel` 保活。先运行状态命令，不要启动第二个。
 - iLink 和测试号配置均使用当前 Windows 用户 DPAPI 保存；当前选择器为 `weixin-ilink`。
-- 55/55 自动化测试通过。
+- 56/56 自动化测试通过。
 - 2400 字符输出与 citation/rollout 尾部清理已完成真实微信复验。随后发现末尾 `::git-commit{...}` 仍会外泄，现已增加 Codex UI 指令白名单清理，等待下一条真实微信通知复验。
 - API 错误、中断和离线恢复尚未全部验收。
 - 稳定 UIN、更新游标和最新 context 已使用独立 DPAPI blob 持久化；完整 watcher 停止和换 PID 重启后，无绑定真实投递已通过。整机冷启动尚未现场验收，不得提前宣称通过。
-- 不得再次把 watcher 改为无条件常驻；当前用户明确要求 Desktop/CLI 关闭后 30 秒停止、启动时自动恢复。
+- 不得再次把 watcher 改为无条件常驻；当前用户要求 Desktop/CLI 关闭后 30 秒停止、启动时自动恢复。为降低 context 静默过期风险，唯一 supervisor 可在 watcher 停止期间继续执行保活，但不得新增常驻进程或计划任务。
 - 2026-07-28 测试号曾完成生产实发，但真实客户端证明长变量会被卡片截断且不能展开；用户随后明确要求切回 iLink。
 - 两条 failed 是切换前已经达到最大尝试次数的旧 iLink 记录，outbox 在调用新 adapter 前即将其移入 failed。不得读取正文、重放或删除，除非用户另行明确授权。
 
 ## 禁止回退
 
 - 不修改 Codex `config.toml`、`base_url`、认证或启用 `15722`。
-- 不安装或恢复 OpenClaw、Gateway、`openclaw-weixin` channel；生产发送链路是仓库内置的微信公众号测试号 adapter。
+- 不安装或恢复 OpenClaw、Gateway、`openclaw-weixin` channel；生产发送链路是仓库内置的直接 iLink adapter。测试号仅保留备用配置。
 - 不启用 Stop hook、生产 CLI wrapper、API proxy、第二个 service/watcher 或其他计划任务；唯一允许的是 `CodexWeChatNotifierLifecycle`。
 - 同一任务在 context 失效期间只保留最新待发终态，避免恢复后旧通知连续消耗新 context。
 - 不得将 `weixin-ilink-session.dpapi.json` 的解密内容、字段值或 helper stdin/stdout 写入日志、响应或 Git。
@@ -32,6 +32,8 @@
 3. 代码修改前做 GitNexus impact，提交前做 `detect_changes`。
 4. 运行 `npm run check`、`npm test`、`git diff --check`。
 5. 只暂存本任务文件，本地提交，不 push；提交后刷新 GitNexus 索引。
+
+`sendmessage` 省略 context 时曾返回 HTTP 200 但微信未收到，禁止将该路径作为兜底。`KeepAlive` 的单次真实 API 调用已验证，长期延长与冷启动后首次通知仍需现场验收。
 
 ## 后续验收
 

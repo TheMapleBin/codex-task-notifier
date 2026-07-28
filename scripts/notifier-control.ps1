@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Configure', 'Start', 'Stop', 'Status', 'UseTestAccount', 'UseIlink')]
+    [ValidateSet('Configure', 'Start', 'Stop', 'Status', 'KeepAlive', 'UseTestAccount', 'UseIlink')]
     [string]$Action
 )
 
@@ -25,6 +25,7 @@ function Get-ControlPaths {
         RuntimeHome = Join-Path $root 'live'
         RunDirectory = Join-Path $root 'run'
         PidPath = Join-Path $root 'run\watcher.pid.json'
+        KeepAliveStatusPath = Join-Path $root 'run\ilink-keepalive-status.json'
         LogDirectory = Join-Path $root 'logs'
         StdoutPath = Join-Path $root 'logs\watcher.out.log'
         StderrPath = Join-Path $root 'logs\watcher.err.log'
@@ -135,6 +136,44 @@ function Unprotect-Value {
     } finally {
         [Array]::Clear($bytes, 0, $bytes.Length)
     }
+}
+
+function Unprotect-IlinkSessionValue {
+    param([Parameter(Mandatory = $true)][string]$Value)
+    $protected = [Convert]::FromBase64String($Value)
+    $bytes = [Security.Cryptography.ProtectedData]::Unprotect(
+        $protected,
+        [Text.Encoding]::UTF8.GetBytes('CodexWeChatNotifier/iLinkSession/v1'),
+        [Security.Cryptography.DataProtectionScope]::CurrentUser
+    )
+    try {
+        [Text.Encoding]::UTF8.GetString($bytes)
+    } finally {
+        [Array]::Clear($bytes, 0, $bytes.Length)
+    }
+}
+
+function ConvertFrom-WebResponseJson {
+    param([Parameter(Mandatory = $true)][object]$Content)
+    $text = if ($Content -is [byte[]]) {
+        [Text.Encoding]::UTF8.GetString($Content)
+    } else {
+        [string]$Content
+    }
+    try {
+        $text | ConvertFrom-Json
+    } finally {
+        $text = $null
+    }
+}
+
+function Get-IlinkResponseCode {
+    param([Parameter(Mandatory = $true)][object]$Payload)
+    $errcode = $Payload.PSObject.Properties['errcode']
+    if ($null -ne $errcode -and $null -ne $errcode.Value) { return [int]$errcode.Value }
+    $ret = $Payload.PSObject.Properties['ret']
+    if ($null -ne $ret -and $null -ne $ret.Value) { return [int]$ret.Value }
+    0
 }
 
 function ConvertTo-SecureValue {
@@ -406,6 +445,107 @@ function Invoke-UseIlink {
     Write-Host 'Production transport selected: direct WeChat iLink.'
 }
 
+function Write-KeepAliveStatus {
+    param(
+        [Parameter(Mandatory = $true)][object]$Paths,
+        [Parameter(Mandatory = $true)][bool]$Ok,
+        [Parameter(Mandatory = $true)][string]$Code
+    )
+    [System.IO.Directory]::CreateDirectory($Paths.RunDirectory) | Out-Null
+    Write-JsonAtomic -Path $Paths.KeepAliveStatusPath -Value ([ordered]@{
+        schemaVersion = 1
+        ok = $Ok
+        code = $Code
+        checkedAt = [DateTime]::UtcNow.ToString('o')
+    })
+}
+
+function Invoke-IlinkKeepAlive {
+    param([Parameter(Mandatory = $true)][object]$Paths)
+    if ($env:CODEX_NOTIFY_ILINK_KEEPALIVE_FIXTURE) {
+        $fixture = Get-Content -LiteralPath $env:CODEX_NOTIFY_ILINK_KEEPALIVE_FIXTURE -Raw | ConvertFrom-Json
+        $ok = $fixture.ok -eq $true
+        Write-KeepAliveStatus -Paths $Paths -Ok $ok -Code $(if ($ok) { 'ok' } else { 'fixture_failed' })
+        if (-not $ok) { throw 'iLink keepalive failed.' }
+        return
+    }
+
+    $configPath = $Paths.ConfigPath
+    $sessionPath = Join-Path $Paths.SecureDirectory 'weixin-ilink-session.dpapi.json'
+    if (-not (Test-Path -LiteralPath $configPath) -or -not (Test-Path -LiteralPath $sessionPath)) {
+        Write-KeepAliveStatus -Paths $Paths -Ok $false -Code 'context_missing'
+        throw 'iLink keepalive context is unavailable.'
+    }
+
+    $botToken = $null
+    $baseUrl = $null
+    $toUserId = $null
+    $contextToken = $null
+    $typingTicket = $null
+    try {
+        $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+        $sessionRecord = Get-Content -LiteralPath $sessionPath -Raw | ConvertFrom-Json
+        if ($config.schemaVersion -ne 2 -or $config.transport -ne 'weixin-ilink' -or $sessionRecord.schemaVersion -ne 1 -or -not $sessionRecord.protectedData) {
+            throw 'invalid protected configuration'
+        }
+        $session = Unprotect-IlinkSessionValue ([string]$sessionRecord.protectedData) | ConvertFrom-Json
+        $botToken = Unprotect-Value ([string]$config.botToken)
+        $baseUrl = Unprotect-Value ([string]$config.baseUrl)
+        $toUserId = [string]$session.toUserId
+        $contextToken = [string]$session.contextToken
+        $wechatUin = [string]$session.wechatUin
+        if (-not $botToken -or -not $baseUrl -or -not $toUserId -or -not $contextToken -or -not $wechatUin) {
+            throw 'missing protected context'
+        }
+        $baseUri = [Uri]$baseUrl
+        if ($baseUri.Scheme -ne 'https' -or ($baseUri.Host -ne 'weixin.qq.com' -and -not $baseUri.Host.EndsWith('.weixin.qq.com', [StringComparison]::OrdinalIgnoreCase))) {
+            throw 'unapproved iLink base URL'
+        }
+        $baseUrl = $baseUri.GetLeftPart([UriPartial]::Authority)
+
+        $headers = @{
+            Authorization = "Bearer $botToken"
+            AuthorizationType = 'ilink_bot_token'
+            'X-WECHAT-UIN' = $wechatUin
+        }
+        $baseInfo = @{ channel_version = '1.0.2'; bot_agent = 'codex-openclaw-notifier' }
+        $configBody = @{
+            ilink_user_id = $toUserId
+            context_token = $contextToken
+            base_info = $baseInfo
+        } | ConvertTo-Json -Depth 6 -Compress
+        $configResponse = Invoke-WebRequest -Uri ($baseUrl.TrimEnd('/') + '/ilink/bot/getconfig') -Method Post -Headers $headers -ContentType 'application/json' -Body ([Text.Encoding]::UTF8.GetBytes($configBody)) -TimeoutSec 15
+        $configPayload = ConvertFrom-WebResponseJson $configResponse.Content
+        $ticketProperty = $configPayload.PSObject.Properties['typing_ticket']
+        if ((Get-IlinkResponseCode $configPayload) -ne 0 -or $null -eq $ticketProperty -or -not $ticketProperty.Value) {
+            throw 'typing ticket unavailable'
+        }
+        $typingTicket = [string]$ticketProperty.Value
+
+        foreach ($status in 1, 2) {
+            $typingBody = @{
+                ilink_user_id = $toUserId
+                typing_ticket = $typingTicket
+                status = $status
+                base_info = $baseInfo
+            } | ConvertTo-Json -Depth 6 -Compress
+            $typingResponse = Invoke-WebRequest -Uri ($baseUrl.TrimEnd('/') + '/ilink/bot/sendtyping') -Method Post -Headers $headers -ContentType 'application/json' -Body ([Text.Encoding]::UTF8.GetBytes($typingBody)) -TimeoutSec 15
+            $typingPayload = ConvertFrom-WebResponseJson $typingResponse.Content
+            if ((Get-IlinkResponseCode $typingPayload) -ne 0) { throw 'typing request rejected' }
+        }
+        Write-KeepAliveStatus -Paths $Paths -Ok $true -Code 'ok'
+    } catch {
+        Write-KeepAliveStatus -Paths $Paths -Ok $false -Code 'request_failed'
+        throw 'iLink keepalive failed.'
+    } finally {
+        $botToken = $null
+        $baseUrl = $null
+        $toUserId = $null
+        $contextToken = $null
+        $typingTicket = $null
+    }
+}
+
 function Invoke-Status {
     param(
         [Parameter(Mandatory = $true)][object]$Paths,
@@ -425,6 +565,16 @@ function Invoke-Status {
     Write-Host "Pending: $(Get-JsonCount (Join-Path $Paths.RuntimeHome 'outbox\pending'))"
     Write-Host "Delivered: $(Get-JsonCount (Join-Path $Paths.RuntimeHome 'outbox\delivered'))"
     Write-Host "Failed: $(Get-JsonCount (Join-Path $Paths.RuntimeHome 'outbox\failed'))"
+    if (Test-Path -LiteralPath $Paths.KeepAliveStatusPath) {
+        try {
+            $keepAlive = Get-Content -LiteralPath $Paths.KeepAliveStatusPath -Raw | ConvertFrom-Json
+            Write-Host "ClawBot keepalive: $(if ($keepAlive.ok) { 'ok' } else { 'failed' }) ($($keepAlive.checkedAt))"
+        } catch {
+            Write-Host 'ClawBot keepalive: unknown'
+        }
+    } else {
+        Write-Host 'ClawBot keepalive: not checked'
+    }
     Write-Host "Logs: $($Paths.LogDirectory)"
 }
 
@@ -437,6 +587,7 @@ try {
         'Start' { Invoke-Start -Paths $paths -RepositoryRoot $repositoryRoot }
         'Stop' { Invoke-Stop -Paths $paths -RepositoryRoot $repositoryRoot }
         'Status' { Invoke-Status -Paths $paths -RepositoryRoot $repositoryRoot }
+        'KeepAlive' { Invoke-IlinkKeepAlive -Paths $paths }
         'UseTestAccount' { Invoke-UseTestAccount -Paths $paths }
         'UseIlink' { Invoke-UseIlink -Paths $paths }
     }

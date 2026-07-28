@@ -18,6 +18,7 @@ test("lifecycle starts for Codex and stops after Codex becomes idle", async () =
     script,
     "--poll-ms", "100",
     "--idle-grace-ms", "0",
+    "--keepalive-ms", "600000",
     "--max-iterations", "4"
   ], {
     cwd: path.resolve("."),
@@ -33,6 +34,6 @@ test("lifecycle starts for Codex and stops after Codex becomes idle", async () =
 
   assert.equal(result.status, 0, result.stderr);
   const actions = (await fs.readFile(controlLog, "utf8")).trim().split(/\r?\n/);
-  assert.deepEqual(actions, ["Start", "Stop"]);
+  assert.deepEqual(actions, ["Start", "KeepAlive", "Stop"]);
   await assert.rejects(fs.access(path.join(controlHome, "run", "lifecycle.pid.json")));
 });

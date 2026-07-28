@@ -132,3 +132,23 @@ test("production control starts the watcher with protected WeChat test-account c
     runControl("Stop", env);
   }
 });
+
+test("ClawBot keepalive records only sanitized status", async () => {
+  const controlHome = await temporaryDirectory();
+  const fixturePath = path.join(controlHome, "keepalive.json");
+  await fs.writeFile(fixturePath, JSON.stringify({ ok: true }));
+  const env = {
+    ...process.env,
+    CODEX_NOTIFY_CONTROL_HOME: controlHome,
+    CODEX_NOTIFY_ILINK_KEEPALIVE_FIXTURE: fixturePath
+  };
+
+  const result = runControl("KeepAlive", env);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(`${result.stdout}${result.stderr}`.trim(), "");
+  const status = JSON.parse(await fs.readFile(path.join(controlHome, "run", "ilink-keepalive-status.json"), "utf8"));
+  assert.equal(status.ok, true);
+  assert.equal(status.code, "ok");
+  assert.equal(Object.hasOwn(status, "token"), false);
+  assert.equal(Object.hasOwn(status, "contextToken"), false);
+});

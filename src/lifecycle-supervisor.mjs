@@ -15,6 +15,7 @@ const pidPath = path.join(runDirectory, "lifecycle.pid.json");
 const logPath = path.join(logDirectory, "lifecycle.log");
 const pollMs = integerOption("--poll-ms", 2_000, 100, 60_000);
 const idleGraceMs = integerOption("--idle-grace-ms", 30_000, 0, 600_000);
+const keepAliveMs = integerOption("--keepalive-ms", 30_000, 5_000, 600_000);
 const maxIterations = integerOption("--max-iterations", 0, 0, 1_000_000);
 
 function integerOption(name, fallback, min, max) {
@@ -109,6 +110,8 @@ async function main() {
   let iteration = 0;
   let lastActiveAt = null;
   let lastDesired = null;
+  let nextKeepAliveAt = 0;
+  let lastKeepAliveOk = null;
   try {
     while (maxIterations === 0 || iteration < maxIterations) {
       const now = Date.now();
@@ -120,6 +123,19 @@ async function main() {
         await control(action);
         await appendLog(`watcher=${action.toLowerCase()} codex=${active ? "active" : "inactive"}`);
         lastDesired = desired;
+      }
+      if (now >= nextKeepAliveAt) {
+        try {
+          await control("KeepAlive");
+          if (lastKeepAliveOk !== true) await appendLog("keepalive=ok");
+          lastKeepAliveOk = true;
+        } catch (error) {
+          if (lastKeepAliveOk !== false) {
+            await appendLog(`keepalive=failed code=${String(error?.code || error?.name || "unknown").slice(0, 64)}`);
+          }
+          lastKeepAliveOk = false;
+        }
+        nextKeepAliveAt = Date.now() + keepAliveMs;
       }
       iteration += 1;
       if (maxIterations === 0 || iteration < maxIterations) await sleep(pollMs);
