@@ -46,3 +46,25 @@ test("terminal event suppresses a pending generic Stop event", async () => {
 
   await fs.rm(path.join(home, "outbox"), { recursive: true, force: true });
 });
+
+test("context-blocked pending records wait without consuming attempts and wake immediately", async () => {
+  const home = await temporaryDirectory();
+  const outbox = new Outbox(testConfig(home, { retryMaxMs: 60_000 }));
+  await outbox.init();
+  const event = createEvent({ source: "session-watcher", kind: "turn_finished", turnId: "turn-context" });
+  await outbox.enqueue(event);
+
+  const firstNow = new Date();
+  await outbox.processDue({ send: async () => {
+    throw Object.assign(new Error("context expired"), { code: "ILINK_CONTEXT_EXPIRED" });
+  } }, firstNow);
+  const pendingPath = (await fs.readdir(path.join(home, "outbox", "pending")))[0];
+  const blocked = JSON.parse(await fs.readFile(path.join(home, "outbox", "pending", pendingPath), "utf8"));
+  assert.equal(blocked.attempts, 0);
+  assert.equal(blocked.lastErrorCode, "ILINK_CONTEXT_EXPIRED");
+  assert.ok(new Date(blocked.nextAttemptAt) > firstNow);
+
+  assert.equal(await outbox.wakeContextPending(new Date(firstNow.getTime() + 1_000)), 1);
+  await outbox.processDue({ send: async () => ({ ok: true }) }, new Date(firstNow.getTime() + 1_000));
+  assert.deepEqual(await outbox.counts(), { pending: 0, delivered: 1, failed: 0, incoming: 0 });
+});

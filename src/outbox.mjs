@@ -65,6 +65,24 @@ function retryDelayMs(record, config) {
   return Math.min(config.retryMaxMs, config.retryBaseMs * 2 ** exponent);
 }
 
+const CONTEXT_BLOCKED_CODES = new Set(["ILINK_CONTEXT_REQUIRED", "ILINK_CONTEXT_EXPIRED"]);
+const CONTEXT_BLOCKED_MESSAGES = new Set([
+  "iLink has no active WeChat conversation; send the bot one message first.",
+  "iLink conversation context expired; send the bot one message to refresh it."
+]);
+
+function isContextBlockedError(error) {
+  return CONTEXT_BLOCKED_CODES.has(error?.code) || CONTEXT_BLOCKED_MESSAGES.has(String(error?.message || error));
+}
+
+function isContextBlockedRecord(record) {
+  return CONTEXT_BLOCKED_CODES.has(record?.lastErrorCode) || CONTEXT_BLOCKED_MESSAGES.has(record?.lastError);
+}
+
+function safeErrorCode(error) {
+  return typeof error?.code === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(error.code) ? error.code : null;
+}
+
 export class Outbox {
   constructor(config) {
     this.config = config;
@@ -151,6 +169,23 @@ export class Outbox {
     return removed;
   }
 
+  async wakeContextPending(now = new Date()) {
+    const nextAttemptAt = now.toISOString();
+    let woken = 0;
+    for (const filePath of await listJsonFiles(this.pendingDirectory)) {
+      try {
+        const record = await readJson(filePath);
+        if (!isContextBlockedRecord(record)) continue;
+        if (new Date(record.nextAttemptAt).getTime() <= now.getTime()) continue;
+        await replaceJson(filePath, { ...record, nextAttemptAt });
+        woken += 1;
+      } catch {
+        await this.#moveToFailed(filePath, { malformed: true });
+      }
+    }
+    return woken;
+  }
+
   async processDue(adapter, now = new Date()) {
     if (this.processing) return this.processing;
     this.processing = this.#processDue(adapter, now).finally(() => {
@@ -188,10 +223,13 @@ export class Outbox {
         await this.#move(filePath, path.join(this.deliveredDirectory, path.basename(filePath)), deliveredRecord);
         delivered += 1;
       } catch (error) {
+        const contextBlocked = isContextBlockedError(error);
+        const attempts = contextBlocked ? record.attempts : record.attempts + 1;
         const updated = {
           ...record,
-          attempts: record.attempts + 1,
-          nextAttemptAt: new Date(now.getTime() + retryDelayMs({ ...record, attempts: record.attempts + 1 }, this.config)).toISOString(),
+          attempts,
+          nextAttemptAt: new Date(now.getTime() + (contextBlocked ? this.config.retryMaxMs : retryDelayMs({ ...record, attempts }, this.config))).toISOString(),
+          lastErrorCode: safeErrorCode(error),
           lastError: String(error?.message || error).slice(0, 160)
         };
         await replaceJson(filePath, updated);

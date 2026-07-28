@@ -25,6 +25,7 @@ function response(value, { ok = true, status = 200 } = {}) {
 
 test("iLink adapter learns a reply context without reading message text and sends directly", async () => {
   const requests = [];
+  let contextRefreshes = 0;
   let updateCount = 0;
   const fetchImpl = async (url, options) => {
     requests.push({ url, options });
@@ -41,7 +42,7 @@ test("iLink adapter learns a reply context without reading message text and send
     }
     return response({ ret: 0 });
   };
-  const adapter = createIlinkAdapter(config(), { fetchImpl, randomBytes: () => Buffer.alloc(4, 1), sessionStore: null });
+  const adapter = createIlinkAdapter(config(), { fetchImpl, randomBytes: () => Buffer.alloc(4, 1), sessionStore: null, onContextRefreshed: async () => { contextRefreshes += 1; } });
   await adapter.start();
   while (updateCount < 2) await new Promise((resolve) => setImmediate(resolve));
   try {
@@ -53,6 +54,7 @@ test("iLink adapter learns a reply context without reading message text and send
     assert.equal(body.msg.context_token, "test-context");
     assert.doesNotMatch(body.msg.item_list[0].text_item.text, /must-not-be-used/);
     assert.equal(send.options.headers.authorization, "Bearer test-bot-token");
+    assert.equal(contextRefreshes, 1);
   } finally {
     await adapter.close();
   }

@@ -47,13 +47,14 @@ function readJsonBody(request) {
   });
 }
 
-function selectAdapter(config) {
-  if (config.adapter === "ilink") return createIlinkAdapter(config);
+function selectAdapter(config, options = {}) {
+  if (config.adapter === "ilink") return createIlinkAdapter(config, options);
   if (config.adapter === "wechat-test-account") return createWechatTestAccountAdapter(config);
   return createDryRunAdapter(config);
 }
 
-export function createNotifierService(config, { adapter = selectAdapter(config), outbox = new Outbox(config) } = {}) {
+export function createNotifierService(config, { adapter: providedAdapter = null, outbox = new Outbox(config) } = {}) {
+  let adapter = providedAdapter;
   let server = null;
   let timer = null;
   let closing = false;
@@ -77,6 +78,13 @@ export function createNotifierService(config, { adapter = selectAdapter(config),
       process.stderr.write(`[codex-notify] dispatch loop: ${String(error.message || error)}\n`);
     }
   }
+
+  async function onContextRefreshed() {
+    await outbox.wakeContextPending();
+    await tick();
+  }
+
+  if (!adapter) adapter = selectAdapter(config, { onContextRefreshed });
 
   async function start({ listen = true } = {}) {
     await outbox.init();

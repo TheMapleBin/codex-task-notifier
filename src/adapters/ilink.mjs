@@ -4,6 +4,12 @@ import { formatEventForDelivery } from "../event.mjs";
 import { createIlinkSessionStore } from "../ilink-session-state.mjs";
 
 const CHANNEL_VERSION = "1.0.2";
+export const ILINK_CONTEXT_REQUIRED_CODE = "ILINK_CONTEXT_REQUIRED";
+export const ILINK_CONTEXT_EXPIRED_CODE = "ILINK_CONTEXT_EXPIRED";
+
+function contextError(code, message) {
+  return Object.assign(new Error(message), { code });
+}
 
 function validateBaseUrl(value) {
   const url = new URL(value);
@@ -59,7 +65,8 @@ function initialContext(settings) {
 export function createIlinkAdapter(config, {
   fetchImpl = globalThis.fetch,
   randomBytes = crypto.randomBytes,
-  sessionStore = createIlinkSessionStore()
+  sessionStore = createIlinkSessionStore(),
+  onContextRefreshed = null
 } = {}) {
   const settings = config.ilink;
   if (!settings?.botToken || !settings?.baseUrl) {
@@ -134,6 +141,7 @@ export function createIlinkAdapter(config, {
 
     if (result?.ret === -14 || result?.errcode === -14) throw new Error("iLink authentication expired.");
     let changed = false;
+    let contextRefreshed = false;
     if (typeof result?.get_updates_buf === "string" && result.get_updates_buf && result.get_updates_buf !== cursor) {
       cursor = result.get_updates_buf;
       changed = true;
@@ -144,8 +152,16 @@ export function createIlinkAdapter(config, {
       if (typeof message.context_token !== "string" || !message.context_token) continue;
       context = { toUserId: message.from_user_id, contextToken: message.context_token };
       changed = true;
+      contextRefreshed = true;
     }
     if (changed) await persistSession();
+    if (contextRefreshed && typeof onContextRefreshed === "function") {
+      try {
+        await onContextRefreshed();
+      } catch {
+        process.stderr.write("[codex-notify] ilink_context_refresh_callback_failed\n");
+      }
+    }
   }
 
   async function pollLoop(signal) {
@@ -180,7 +196,9 @@ export function createIlinkAdapter(config, {
       stopController = null;
     },
     async send(event) {
-      if (!context) throw new Error("iLink has no active WeChat conversation; send the bot one message first.");
+      if (!context) {
+        throw contextError(ILINK_CONTEXT_REQUIRED_CODE, "iLink has no active WeChat conversation; send the bot one message first.");
+      }
       const active = context;
       const result = await requestJson(`${baseUrl}/ilink/bot/sendmessage`, {
         msg: {
@@ -201,7 +219,7 @@ export function createIlinkAdapter(config, {
       if (responseCode === -2) {
         context = null;
         await persistSession();
-        throw new Error("iLink conversation context expired; send the bot one message to refresh it.");
+        throw contextError(ILINK_CONTEXT_EXPIRED_CODE, "iLink conversation context expired; send the bot one message to refresh it.");
       }
       if (responseCode === -14) throw new Error("iLink authentication expired.");
       if (responseCode != null && responseCode !== 0) throw new Error(`iLink send failed with code ${responseCode}.`);
