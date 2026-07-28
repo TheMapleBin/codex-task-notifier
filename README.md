@@ -13,7 +13,7 @@ Codex rollout JSONL -> watcher -> durable outbox -> WeChat iLink
 - 2026-07-28 已完成直接 iLink 真实验收：两个已捕获事件从 `pending` 进入 `delivered`，收件人确认微信实际收到，且通知包含最终 assistant 输出。
 - 2026-07-28 已完成 2400 字符输出与 citation/rollout 尾部净化复验。随后发现 Codex UI 的 `::git-commit{...}` 尾行仍会外泄，现已增加受限白名单清理，等待下一条真实微信通知复验。
 - 当前轻量 watcher 已配置；是否运行以 `notifier-status.cmd` 的实时结果为准。
-- 自动化验证为 47/47，覆盖直接 iLink、DPAPI 配置、加密会话恢复、outbox 重试、终态识别、子代理过滤、跟随 Codex 的生命周期、待发终态合并、敏感信息净化、残缺/转义内部元数据、尾部 Codex UI 指令清理和安全任务名称。
+- 自动化验证为 52/52，覆盖直接 iLink、微信公众号测试号试验 adapter、DPAPI 配置、加密会话恢复、outbox 重试、终态识别、子代理过滤、跟随 Codex 的生命周期、待发终态合并、敏感信息净化、残缺/转义内部元数据、尾部 Codex UI 指令清理和安全任务名称。
 - 尚未完成：Desktop/API 可控错误、CLI 非零/API 错误、用户中断、微信离线后恢复的全部真实验收。
 - 从未启用：`15722`、`base_url` 切换、Stop hook、生产 CLI wrapper 或新服务。唯一计划任务在用户登录时启动轻量 supervisor；watcher 只在 Codex Desktop/CLI 运行时存在。
 
@@ -37,6 +37,8 @@ Codex rollout JSONL -> watcher -> durable outbox -> WeChat iLink
 自动模式只新增一个当前用户登录计划任务和一个轻量 supervisor。Codex Desktop/CLI 任一运行时启动 watcher；全部退出 30 秒后停止 watcher。DPAPI 会话恢复已通过完整停止、换 PID 重启和无绑定真实微信投递，因此跟随启停不会丢失已保存的 iLink 会话。
 
 运行目录为 `%LOCALAPPDATA%\CodexWeChatNotifier`。
+
+微信公众号测试号模板消息目前是独立试验路径，不会接管生产 watcher。配置和真实实发步骤见 [微信公众号测试号试验](docs/wechat-test-account-trial.md)。
 
 ## 验证
 
