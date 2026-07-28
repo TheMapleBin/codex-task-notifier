@@ -93,7 +93,7 @@ function Read-RequiredSecret {
 function Invoke-Configure {
     param([Parameter(Mandatory = $true)][object]$Paths)
     Write-Host 'In the WeChat test-account page, create a template whose body is exactly:'
-    Write-Host '{{content.DATA}}'
+    Write-Host '通知内容：{{content.DATA}}'
     Write-Host 'Values entered below are encrypted for the current Windows user and are not printed.'
     $appId = Read-RequiredSecret 'AppID'
     $appSecret = Read-RequiredSecret 'AppSecret'

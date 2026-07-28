@@ -8,6 +8,7 @@
 | --- | --- | --- | --- | --- | --- |
 | Codex Desktop 正常完成（直接 iLink） | 通过 | 通过 | 通过 | 通过 | 两条 pending 转 delivered，用户确认收到；其中一条包含最终输出 |
 | Codex 正常完成（微信公众号测试号生产路径） | 通过 | 通过 | 通过 | 通过 | 用户确认连续收到两条“Codex 通知”；现场计数 Pending 0 / Delivered 40 / Failed 2 |
+| 测试号模板正文渲染 | 通过 | 不适用 | 通过 | 通过 | 固定标签模板显示变量；单行分隔可显示多字段，但长变量会被卡片截断且不能展开 |
 
 直接 iLink 验收期间未修改 `C:\Users\TheMapleBin\.codex\config.toml`、`base_url` 或 `15722`。
 

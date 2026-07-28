@@ -50,6 +50,8 @@ test("WeChat test-account adapter obtains a token and sends the expected templat
   assert.equal(body.touser, "test-open-id");
   assert.equal(body.template_id, "test-template-id");
   assert.match(body.data.content.value, /safe output/);
+  assert.doesNotMatch(body.data.content.value, /[\r\n]/);
+  assert.match(body.data.content.value, /\[Codex\] \| /);
 });
 
 test("WeChat test-account adapter caches access tokens", async () => {

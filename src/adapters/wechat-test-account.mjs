@@ -5,6 +5,10 @@ const TOKEN_ENDPOINT = "https://api.weixin.qq.com/cgi-bin/token";
 const SEND_ENDPOINT = "https://api.weixin.qq.com/cgi-bin/message/template/send";
 const TOKEN_REFRESH_SKEW_MS = 60_000;
 
+function formatTemplateValue(event) {
+  return formatEventForDelivery(event).replace(/\r?\n+/g, " | ").trim();
+}
+
 function required(value, name) {
   if (typeof value !== "string" || !value.trim()) {
     throw new Error(`WeChat test account requires ${name}.`);
@@ -114,7 +118,7 @@ export function createWechatTestAccountAdapter(config, {
       body: JSON.stringify({
         touser: active.openId,
         template_id: active.templateId,
-        data: { content: { value: formatEventForDelivery(event) } }
+        data: { content: { value: formatTemplateValue(event) } }
       })
     }, { fetchImpl, timeoutMs, operation: "send" });
   }

@@ -6,7 +6,7 @@
 
 1. 使用固定微信官方地址 `https://api.weixin.qq.com/cgi-bin/token`，通过 `client_credential`、`AppID` 和 `AppSecret` 获取短期 `access_token`。
 2. 使用固定微信官方地址 `https://api.weixin.qq.com/cgi-bin/message/template/send`，通过接收人的 `OpenID` 和模板 ID 发送模板消息。
-3. 测试模板内容为 `{{content.DATA}}`，消息值继续使用项目已有的净化格式化函数。
+3. 测试模板内容为 `通知内容：{{content.DATA}}`；纯变量模板在真实微信中只显示标题。消息值继续使用项目已有的净化格式化函数，并针对测试号卡片将换行转换为单行分隔符。
 4. `access_token` 在进程内缓存，失效错误只允许刷新并重试一次。
 
 ## 安全边界
@@ -26,6 +26,7 @@
 - 切换后状态命令显示 `Transport: WeChat Official Account test account`、`Pending: 0`、`Delivered: 40`、`Failed: 2`。
 - watcher PID `24468`、生命周期 supervisor PID `25548`，唯一计划任务 `CodexWeChatNotifierLifecycle` 为运行状态；PID 仅是当次现场快照，不作为长期配置。
 - 两条 failed 是切换前已耗尽重试次数的旧 iLink 记录，并非测试号 adapter 返回失败；未读取其正文。
+- 真实客户端已证明带固定标签的模板能显示变量；测试号卡片会截断单个长变量，且未配置 `url` 时不能点击展开。
 
 ## 尚未证明
 

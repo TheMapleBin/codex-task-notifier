@@ -53,7 +53,13 @@ function Invoke-Enable {
     if (-not (Test-Path -LiteralPath $supervisorScript)) { throw 'Lifecycle supervisor runtime was not found.' }
     Stop-ExistingLifecycle
     $node = (Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
-    $scheduledAction = New-ScheduledTaskAction -Execute $node -Argument "`"$supervisorScript`"" -WorkingDirectory $repositoryRoot
+    $powerShell = Get-Command pwsh.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -eq $powerShell) {
+        $powerShell = Get-Command powershell.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1
+    }
+    $command = "& '$($node.Replace("'", "''"))' '$($supervisorScript.Replace("'", "''"))'"
+    $encodedCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
+    $scheduledAction = New-ScheduledTaskAction -Execute $powerShell.Source -Argument "-NoProfile -WindowStyle Hidden -EncodedCommand $encodedCommand" -WorkingDirectory $repositoryRoot
     $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
     $principal = New-ScheduledTaskPrincipal -UserId ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
