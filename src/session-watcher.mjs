@@ -53,6 +53,7 @@ function terminalEvent(record, state) {
     source: "session-watcher",
     occurredAt: payload.completed_at || record.timestamp || new Date().toISOString(),
     workspace: state.workspace,
+    taskName: state.taskName,
     surface: "unknown",
     turnId,
     durationMs: payload.duration_ms,
@@ -83,12 +84,15 @@ function terminalEvent(record, state) {
   return null;
 }
 
-export function createSessionWatcher({ sessionsDir, onEvent, pollIntervalMs = 1_000, excludeSubagents = true }) {
+export function createSessionWatcher({ sessionsDir, onEvent, pollIntervalMs = 1_000, excludeSubagents = true, resolveTaskName = async () => null }) {
   const states = new Map();
   let timer = null;
   let scanning = false;
 
   function updateContext(record, state) {
+    if (record.type === "session_meta") {
+      state.threadId = record.payload?.id || record.payload?.session_id || state.threadId;
+    }
     const startedTurnId = record.type === "event_msg" && record.payload?.type === "task_started"
       ? record.payload?.turn_id || record.payload?.turnId
       : record.type === "turn_context"
@@ -112,6 +116,8 @@ export function createSessionWatcher({ sessionsDir, onEvent, pollIntervalMs = 1_
       pending: "",
       emitted: new Set(),
       workspace: null,
+      threadId: null,
+      taskName: undefined,
       subagent: false,
       turnId: null,
       lastAssistantOutput: null
@@ -149,6 +155,8 @@ export function createSessionWatcher({ sessionsDir, onEvent, pollIntervalMs = 1_
           state.pending = "";
           state.emitted.clear();
           state.workspace = null;
+          state.threadId = null;
+          state.taskName = undefined;
           state.subagent = false;
           state.turnId = null;
           state.lastAssistantOutput = null;
@@ -172,8 +180,12 @@ export function createSessionWatcher({ sessionsDir, onEvent, pollIntervalMs = 1_
           }
           updateContext(record, state);
           if (excludeSubagents && state.subagent) continue;
-          const eventInput = terminalEvent(record, state);
+          let eventInput = terminalEvent(record, state);
           if (!eventInput) continue;
+          if (state.threadId) {
+            state.taskName = await resolveTaskName(state.threadId);
+            eventInput = terminalEvent(record, state);
+          }
           const event = createEvent(eventInput);
           if (state.emitted.has(event.id)) continue;
           state.emitted.add(event.id);

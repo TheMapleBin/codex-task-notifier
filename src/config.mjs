@@ -33,7 +33,7 @@ function booleanFromEnv(value, fallback) {
 
 function secureValueFromEnv(value, name, { required = false } = {}) {
   if (value == null || value === "") {
-    if (required) throw new Error(`${name} is required when CODEX_NOTIFY_ADAPTER=openclaw.`);
+    if (required) throw new Error(`${name} is required for the selected secure adapter.`);
     return null;
   }
   return value;
@@ -46,12 +46,17 @@ export function isLoopbackHost(hostname) {
 
 function resolveDefaultHome(env) {
   const localAppData = env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
-  return path.join(localAppData, "CodexOpenClawNotifier");
+  return path.join(localAppData, "CodexWeChatNotifier");
 }
 
 function resolveDefaultSessions(env) {
   const userProfile = env.USERPROFILE || os.homedir();
   return path.join(userProfile, ".codex", "sessions");
+}
+
+function resolveDefaultStateDatabase(env) {
+  const userProfile = env.USERPROFILE || os.homedir();
+  return path.join(userProfile, ".codex", "state_5.sqlite");
 }
 
 export function loadConfig(env = process.env) {
@@ -69,8 +74,8 @@ export function loadConfig(env = process.env) {
   }
 
   const adapter = env.CODEX_NOTIFY_ADAPTER || "dry-run";
-  if (!["dry-run", "openclaw"].includes(adapter)) {
-    throw new Error("CODEX_NOTIFY_ADAPTER must be dry-run or openclaw.");
+  if (!["dry-run", "ilink"].includes(adapter)) {
+    throw new Error("CODEX_NOTIFY_ADAPTER must be dry-run or ilink.");
   }
 
   const home = path.resolve(env.CODEX_NOTIFY_HOME || resolveDefaultHome(env));
@@ -100,16 +105,27 @@ export function loadConfig(env = process.env) {
       name: "CODEX_NOTIFY_UPSTREAM_TIMEOUT_MS"
     }),
     adapter,
-    openclaw: Object.freeze({
-      command: env.CODEX_NOTIFY_OPENCLAW_COMMAND || "openclaw",
-      channel: "openclaw-weixin",
-      account: secureValueFromEnv(env.CODEX_NOTIFY_OPENCLAW_ACCOUNT, "CODEX_NOTIFY_OPENCLAW_ACCOUNT", { required: adapter === "openclaw" }),
-      target: secureValueFromEnv(env.CODEX_NOTIFY_OPENCLAW_TARGET, "CODEX_NOTIFY_OPENCLAW_TARGET", { required: adapter === "openclaw" }),
-      timeoutMs: integerFromEnv(env.CODEX_NOTIFY_OPENCLAW_TIMEOUT_MS, 30_000, {
+    ilink: Object.freeze({
+      botToken: secureValueFromEnv(env.CODEX_NOTIFY_ILINK_BOT_TOKEN, "CODEX_NOTIFY_ILINK_BOT_TOKEN", { required: adapter === "ilink" }),
+      baseUrl: secureValueFromEnv(env.CODEX_NOTIFY_ILINK_BASE_URL, "CODEX_NOTIFY_ILINK_BASE_URL", { required: adapter === "ilink" }),
+      toUserId: secureValueFromEnv(env.CODEX_NOTIFY_ILINK_TO_USER_ID, "CODEX_NOTIFY_ILINK_TO_USER_ID"),
+      contextToken: secureValueFromEnv(env.CODEX_NOTIFY_ILINK_CONTEXT_TOKEN, "CODEX_NOTIFY_ILINK_CONTEXT_TOKEN"),
+      sendTimeoutMs: integerFromEnv(env.CODEX_NOTIFY_ILINK_SEND_TIMEOUT_MS, 45_000, {
         min: 1_000,
         max: 300_000,
-        name: "CODEX_NOTIFY_OPENCLAW_TIMEOUT_MS"
-      })
+        name: "CODEX_NOTIFY_ILINK_SEND_TIMEOUT_MS"
+      }),
+      pollTimeoutMs: integerFromEnv(env.CODEX_NOTIFY_ILINK_POLL_TIMEOUT_MS, 60_000, {
+        min: 5_000,
+        max: 300_000,
+        name: "CODEX_NOTIFY_ILINK_POLL_TIMEOUT_MS"
+      }),
+      retryMs: integerFromEnv(env.CODEX_NOTIFY_ILINK_RETRY_MS, 5_000, {
+        min: 500,
+        max: 300_000,
+        name: "CODEX_NOTIFY_ILINK_RETRY_MS"
+      }),
+      pollEnabled: booleanFromEnv(env.CODEX_NOTIFY_ILINK_POLL_ENABLED, true)
     }),
     retryBaseMs,
     retryMaxMs: integerFromEnv(env.CODEX_NOTIFY_RETRY_MAX_MS, 1_800_000, {
@@ -133,6 +149,7 @@ export function loadConfig(env = process.env) {
       name: "CODEX_NOTIFY_STOP_HOLD_MS"
     }),
     sessionsDir: path.resolve(env.CODEX_NOTIFY_SESSIONS_DIR || resolveDefaultSessions(env)),
+    stateDatabasePath: path.resolve(env.CODEX_NOTIFY_STATE_DB || resolveDefaultStateDatabase(env)),
     watcherEnabled: booleanFromEnv(env.CODEX_NOTIFY_WATCHER_ENABLED, false),
     apiProxyEnabled: booleanFromEnv(env.CODEX_NOTIFY_PROXY_ENABLED, false)
   });

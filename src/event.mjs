@@ -29,6 +29,7 @@ const DEFAULT_SEVERITY = {
 };
 
 export const FINAL_OUTPUT_MAX_LENGTH = 1_200;
+export const TASK_NAME_MAX_LENGTH = 120;
 
 function cleanText(value, maxLength) {
   if (value == null) {
@@ -55,7 +56,10 @@ function redactSensitiveText(value) {
 
 function safeFinalOutput(value) {
   if (value == null) return null;
-  const normalized = redactSensitiveText(String(value)
+  const withoutInternalMetadata = String(value)
+    .replace(/<oai-mem-citation\b[^>]*>[\s\S]*?<\/oai-mem-citation\s*>/gi, "")
+    .replace(/<oai-mem-citation\b[^>]*>[\s\S]*$/gi, "");
+  const normalized = redactSensitiveText(withoutInternalMetadata
     .replace(/\r\n?/g, "\n")
     .replace(/\t/g, "  ")
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ""))
@@ -64,6 +68,13 @@ function safeFinalOutput(value) {
   const characters = Array.from(normalized);
   if (characters.length <= FINAL_OUTPUT_MAX_LENGTH) return normalized;
   return `${characters.slice(0, FINAL_OUTPUT_MAX_LENGTH - 3).join("")}...`;
+}
+
+function safeTaskName(value) {
+  const cleaned = cleanText(value, TASK_NAME_MAX_LENGTH * 4);
+  if (!cleaned) return null;
+  const characters = Array.from(redactSensitiveText(cleaned));
+  return characters.slice(0, TASK_NAME_MAX_LENGTH).join("");
 }
 
 function asIsoTimestamp(value) {
@@ -174,6 +185,7 @@ export function createEvent(input) {
     severity: severityFor(kind, cleanText(input.severity, 16)),
     occurredAt,
     workspace: workspaceBaseName(input.workspace),
+    taskName: safeTaskName(input.taskName),
     surface: ["desktop", "cli", "unknown"].includes(input.surface) ? input.surface : "unknown",
     turnId,
     requestId,
@@ -201,6 +213,7 @@ export function formatEventForDelivery(event) {
   };
   const lines = ["[Codex]", `来源: ${event.source}`];
   if (event.workspace) lines.push(`项目: ${event.workspace}`);
+  lines.push(`名称: ${event.taskName || "未命名任务"}`);
   lines.push(`状态: ${titles[event.kind] || "状态更新"}`);
   if (event.durationMs != null) lines.push(`耗时: ${formatDuration(event.durationMs)}`);
   if (event.turnId) lines.push(`任务: ${event.turnId.slice(-12)}`);

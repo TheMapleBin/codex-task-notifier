@@ -7,20 +7,24 @@ function baseEnv(overrides = {}) {
   return {
     USERPROFILE: "C:\\Users\\Test",
     LOCALAPPDATA: "C:\\Users\\Test\\AppData\\Local",
-    CODEX_NOTIFY_ADAPTER: "openclaw",
+    CODEX_NOTIFY_ADAPTER: "dry-run",
     ...overrides
   };
 }
 
-test("OpenClaw adapter requires account and target from the process environment", () => {
-  assert.throws(() => loadConfig(baseEnv()), /CODEX_NOTIFY_OPENCLAW_ACCOUNT/);
-  assert.throws(() => loadConfig(baseEnv({ CODEX_NOTIFY_OPENCLAW_ACCOUNT: "test-account" })), /CODEX_NOTIFY_OPENCLAW_TARGET/);
+test("direct iLink adapter requires only QR credentials and accepts optional conversation context", () => {
+  const env = baseEnv({ CODEX_NOTIFY_ADAPTER: "ilink" });
+  assert.throws(() => loadConfig(env), /CODEX_NOTIFY_ILINK_BOT_TOKEN/);
+  assert.throws(() => loadConfig({ ...env, CODEX_NOTIFY_ILINK_BOT_TOKEN: "test-token" }), /CODEX_NOTIFY_ILINK_BASE_URL/);
 
-  const config = loadConfig(baseEnv({
-    CODEX_NOTIFY_OPENCLAW_ACCOUNT: "test-account",
-    CODEX_NOTIFY_OPENCLAW_TARGET: "test-peer@test-account"
-  }));
-  assert.equal(config.openclaw.channel, "openclaw-weixin");
-  assert.equal(config.openclaw.account, "test-account");
-  assert.equal(config.openclaw.target, "test-peer@test-account");
+  const config = loadConfig({
+    ...env,
+    CODEX_NOTIFY_ILINK_BOT_TOKEN: "test-token",
+    CODEX_NOTIFY_ILINK_BASE_URL: "https://ilinkai.weixin.qq.com",
+    CODEX_NOTIFY_ILINK_TO_USER_ID: "test-user",
+    CODEX_NOTIFY_ILINK_CONTEXT_TOKEN: "test-context"
+  });
+  assert.equal(config.adapter, "ilink");
+  assert.equal(config.ilink.toUserId, "test-user");
+  assert.equal(config.ilink.contextToken, "test-context");
 });

@@ -3,6 +3,7 @@ import { loadConfig } from "./config.mjs";
 import { sendEventToLocalService } from "./event-client.mjs";
 import { createNotifierService } from "./notifier-service.mjs";
 import { createSessionWatcher } from "./session-watcher.mjs";
+import { createThreadNameResolver } from "./thread-name.mjs";
 
 function installShutdown(close) {
   let closing = false;
@@ -33,6 +34,7 @@ async function runService(config) {
     const watcher = createSessionWatcher({
       sessionsDir: config.sessionsDir,
       pollIntervalMs: config.pollIntervalMs,
+      resolveTaskName: createThreadNameResolver(config.stateDatabasePath),
       onEvent: (event) => service.submit(event)
     });
     await watcher.start();
@@ -58,6 +60,7 @@ async function runWatcher(config) {
   const watcher = createSessionWatcher({
     sessionsDir: config.sessionsDir,
     pollIntervalMs: config.pollIntervalMs,
+    resolveTaskName: createThreadNameResolver(config.stateDatabasePath),
     onEvent: (event) => service.submit(event)
   });
   await watcher.start();

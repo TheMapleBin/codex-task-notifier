@@ -45,10 +45,11 @@ This project is indexed by GitNexus as **codex-openclaw-notifier** (269 symbols,
 
 ## Notification Safety Gate
 
-This repository has a real WeChat transport test but does **not** have production Codex end-to-end acceptance yet. Before changing notification behavior, read `docs/claude-handoff.md`, `docs/implementation-plan.md`, and `docs/verified-openclaw-contract.md`.
+The current production path is one watcher with a built-in Tencent WeChat iLink adapter. Direct iLink delivery and final assistant output were user-confirmed on 2026-07-28. Read `docs/claude-handoff.md`, `docs/implementation-plan.md`, and `docs/verified-ilink-contract.md` before changes.
 
-- Preserve the existing OpenClaw installation, Gateway schedule, and both configured WeChat channels. Do not delete, recreate, re-login, re-scan a QR code, or add a Gateway/service/schedule.
-- Never read, print, log, commit, or ask chat users to paste account IDs, full targets, tokens, cookies, QR material, prompts, source text, or request/response bodies. The verified adapter reads only the secure environment variables named in `docs/verified-openclaw-contract.md`.
-- Do not change `C:\Users\TheMapleBin\.codex\config.toml`, `base_url`, or enable the `15722` proxy. Do not enable the Stop hook, CLI wrapper, or API proxy as a production path.
-- Do not claim a real WeChat delivery from `dry-run`, tests, configured/enabled status, port/listener checks, or a zero exit code alone. A real acceptance case needs: event captured, outbox persisted, send command succeeded, and user confirmation of receipt.
-- Stage 5 must produce controlled Desktop and CLI failure evidence before Stage 6 can start the single `npm run watch` production candidate. Keep the worktree cleanly scoped: inspect status/diff, stage only task files, commit locally, and do not push.
+- Check `notifier-status.cmd` before starting anything. Never run a second watcher, Gateway, service, proxy, or schedule.
+- Never read, print, log, commit, or request bot tokens, context tokens, user IDs, QR material, prompts, messages, source text, or request/response bodies.
+- Task names use explicit `threads.name` first, then the Codex UI `threads.title`; always apply length limits and credential redaction.
+- Do not change `C:\Users\TheMapleBin\.codex\config.toml`, `base_url`, or enable `15722`, Stop hook, production CLI wrapper, or API proxy.
+- A real acceptance case still requires event capture, outbox persistence, successful send, and user confirmation. API error, interruption, and offline recovery cases remain incomplete.
+- Keep changes scoped: inspect status/diff, stage only task files, commit locally, do not push, and refresh GitNexus after the commit.

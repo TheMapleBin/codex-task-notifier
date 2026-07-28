@@ -17,6 +17,35 @@ function runControl(action, env) {
   });
 }
 
+test("configure stores direct iLink credentials and context without exposing them", async () => {
+  const controlHome = await temporaryDirectory();
+  const fixturePath = path.join(controlHome, "ilink-setup.json");
+  const fixture = { botToken: "test-token", baseUrl: "https://ilinkai.weixin.qq.com", toUserId: "test-user", contextToken: "test-context" };
+  await fs.mkdir(controlHome, { recursive: true });
+  await fs.writeFile(fixturePath, JSON.stringify(fixture));
+
+  const env = {
+    ...process.env,
+    CODEX_NOTIFY_CONTROL_HOME: controlHome,
+    CODEX_NOTIFY_ILINK_SETUP_FIXTURE: fixturePath
+  };
+  const configured = runControl("Configure", env);
+  assert.equal(configured.status, 0, configured.stderr);
+  assert.doesNotMatch(`${configured.stdout}${configured.stderr}`, /test-token|test-user|test-context/);
+
+  const configPath = path.join(controlHome, "secure", "weixin-ilink.dpapi.json");
+  const inspect = spawnSync("powershell.exe", [
+    "-NoProfile",
+    "-Command",
+    "Add-Type -AssemblyName System.Security;$c=Get-Content -LiteralPath $env:TEST_CONFIG -Raw|ConvertFrom-Json;$e=[Text.Encoding]::UTF8.GetBytes('CodexWeChatNotifier/v1');function unprotectTest([string]$v){$b=[Security.Cryptography.ProtectedData]::Unprotect([Convert]::FromBase64String($v),$e,[Security.Cryptography.DataProtectionScope]::CurrentUser);try{return [Text.Encoding]::UTF8.GetString($b)}finally{[Array]::Clear($b,0,$b.Length)}};$bot=unprotectTest ([string]$c.botToken);$base=unprotectTest ([string]$c.baseUrl);$user=unprotectTest ([string]$c.toUserId);$context=unprotectTest ([string]$c.contextToken);[pscustomobject]@{schemaVersion=$c.schemaVersion;transport=$c.transport;matches=($bot -ceq 'test-token' -and $base -ceq 'https://ilinkai.weixin.qq.com' -and $user -ceq 'test-user' -and $context -ceq 'test-context')}|ConvertTo-Json -Compress"
+  ], {
+    env: { ...env, TEST_CONFIG: configPath },
+    encoding: "utf8"
+  });
+  assert.equal(inspect.status, 0, inspect.stderr);
+  assert.deepEqual(JSON.parse(inspect.stdout), { schemaVersion: 2, transport: "weixin-ilink", matches: true });
+});
+
 test("one-click control starts one isolated watcher without exposing protected values", async () => {
   const controlHome = await temporaryDirectory();
   const sessionsDir = path.join(controlHome, "sessions");
@@ -28,14 +57,15 @@ test("one-click control starts one isolated watcher without exposing protected v
     ...process.env,
     CODEX_NOTIFY_CONTROL_HOME: controlHome,
     CODEX_NOTIFY_SESSIONS_DIR: sessionsDir,
-    CODEX_NOTIFY_POLL_MS: "100"
+    CODEX_NOTIFY_POLL_MS: "100",
+    CODEX_NOTIFY_ILINK_POLL_ENABLED: "false"
   };
   const setup = spawnSync("powershell.exe", [
     "-NoProfile",
     "-Command",
-    "Add-Type -AssemblyName System.Security; function p([string]$v){$b=[Text.Encoding]::UTF8.GetBytes($v);$e=[Text.Encoding]::UTF8.GetBytes('CodexOpenClawNotifier/v1');try{[Convert]::ToBase64String([Security.Cryptography.ProtectedData]::Protect($b,$e,[Security.Cryptography.DataProtectionScope]::CurrentUser))}finally{[Array]::Clear($b,0,$b.Length);[Array]::Clear($e,0,$e.Length)}}; @{schemaVersion=1;account=(p 'test-account');target=(p 'test-target')} | ConvertTo-Json -Compress | Set-Content -LiteralPath $env:TEST_CONFIG -Encoding UTF8"
+    "Add-Type -AssemblyName System.Security; function p([string]$v){$b=[Text.Encoding]::UTF8.GetBytes($v);$e=[Text.Encoding]::UTF8.GetBytes('CodexWeChatNotifier/v1');try{[Convert]::ToBase64String([Security.Cryptography.ProtectedData]::Protect($b,$e,[Security.Cryptography.DataProtectionScope]::CurrentUser))}finally{[Array]::Clear($b,0,$b.Length);[Array]::Clear($e,0,$e.Length)}}; @{schemaVersion=2;transport='weixin-ilink';botToken=(p 'test-token');baseUrl=(p 'https://ilinkai.weixin.qq.com');toUserId=(p 'test-user');contextToken=(p 'test-context')} | ConvertTo-Json -Compress | Set-Content -LiteralPath $env:TEST_CONFIG -Encoding UTF8"
   ], {
-    env: { ...env, TEST_CONFIG: path.join(secureDirectory, "openclaw.dpapi.json") },
+    env: { ...env, TEST_CONFIG: path.join(secureDirectory, "weixin-ilink.dpapi.json") },
     encoding: "utf8"
   });
   assert.equal(setup.status, 0, setup.stderr);
@@ -44,7 +74,7 @@ test("one-click control starts one isolated watcher without exposing protected v
     const started = runControl("Start", env);
     assert.equal(started.status, 0, started.stderr);
     assert.match(started.stdout, /Notifier started/);
-    assert.doesNotMatch(`${started.stdout}${started.stderr}`, /test-account|test-target/);
+    assert.doesNotMatch(`${started.stdout}${started.stderr}`, /test-token|test-user|test-context/);
 
     const duplicate = runControl("Start", env);
     assert.equal(duplicate.status, 0, duplicate.stderr);
@@ -54,7 +84,7 @@ test("one-click control starts one isolated watcher without exposing protected v
     assert.equal(status.status, 0, status.stderr);
     assert.match(status.stdout, /Configured: yes/);
     assert.match(status.stdout, /Running: yes/);
-    assert.doesNotMatch(`${status.stdout}${status.stderr}`, /test-account|test-target/);
+    assert.doesNotMatch(`${status.stdout}${status.stderr}`, /test-token|test-user|test-context/);
   } finally {
     runControl("Stop", env);
   }

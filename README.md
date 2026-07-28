@@ -1,39 +1,40 @@
-# Codex OpenClaw Notifier
+# Codex WeChat Notifier
 
-为 Windows 上的 Codex Desktop 与 Codex CLI 提供本地、持久化的任务结束和 API 故障通知桥接。
+Windows 上的轻量 Codex Desktop/CLI 任务终态通知器。当前生产路径只有一个 Node watcher：读取 Codex rollout JSONL，写入持久 outbox，并直接调用腾讯微信 iLink API。
 
-当前代码默认使用 `dry-run` adapter。真实 OpenClaw 微信 adapter 已按本机实发契约实现，但生产 watcher 尚未启动，也没有修改 Codex Desktop/CLI 的全局配置。
+```text
+Codex rollout JSONL -> watcher -> durable outbox -> WeChat iLink
+```
+
+不需要额外消息网关、`account/target`、HTTP 代理、Codex hook 或 CLI 注入。
 
 ## 当前状态
 
-- 已实现并经自动化测试：进程外会话 JSONL watcher、持久 outbox、OpenClaw CLI adapter，以及可选 CLI wrapper。通知可附带当前任务最后一条经净化、截断的 assistant 输出。
-- 已完成真实运输验证：一次 `openclaw message send` 成功退出，且收件人已确认微信实际收到。详见 [发送契约](docs/verified-openclaw-contract.md)。
-- 已完成一项端到端现场验收：新建 CLI 任务正常完成后，watcher 捕获终态、outbox 成功投递，收件人在微信端按验收请求回复。详见 [现场验收记录](docs/live-acceptance.md)。
-- 尚未完成现场验收：Desktop 正常/API 错误、CLI 非零或 API 错误、用户中断和通道离线恢复重试。
-- 未启用：Stop hook、CLI wrapper、API proxy、`15722` 代理和任何新的计划任务或服务。
-- 未修改：`C:\Users\TheMapleBin\.codex\config.toml`、现有 OpenClaw Gateway、既有 Gateway 计划任务，以及两个既有微信 channel 配置。
+- 2026-07-28 已完成直接 iLink 真实验收：两个已捕获事件从 `pending` 进入 `delivered`，收件人确认微信实际收到，且通知包含最终 assistant 输出。
+- 当前轻量 watcher 已配置；是否运行以 `notifier-status.cmd` 的实时结果为准。
+- 自动化验证为 38/38，覆盖直接 iLink、DPAPI 配置、outbox 重试、终态识别、敏感信息净化、内部 citation 清理和安全任务名称。
+- 尚未完成：Desktop/API 可控错误、CLI 非零/API 错误、用户中断、微信离线后恢复的全部真实验收。
+- 从未启用：`15722`、`base_url` 切换、Stop hook、生产 CLI wrapper、新服务或新计划任务。
 
-最终输出最多保留 1200 个字符并保留换行；明显的认证头、Cookie、token、API key、密码和 secret 会被替换。用户 prompt、用户消息、完整会话、原始 API 请求/响应和原始错误正文不进入事件。没有 assistant 结果的 API 失败或中断通知不会显示“输出”段。该新增字段已有软件测试，但尚未单独完成真实微信显示验收。
+通知包含来源、项目、任务名称、状态、耗时、短任务 ID、净化错误类别/HTTP 状态和最后一条 assistant 输出。输出最多 1200 字符；内部 `<oai-mem-citation>` 块、明显 token、Cookie、认证头、密码和 secret 会被移除或遮盖。
 
-接手任务前必须阅读：[实施计划](docs/implementation-plan.md)、[代理交接](docs/claude-handoff.md)、[现场验收记录](docs/live-acceptance.md)、[受控接入说明](docs/codex-setup.md) 和 [发送契约](docs/verified-openclaw-contract.md)。这些文档以阶段门禁为准，不能用自动化测试、端口监听、channel 状态或 dry-run 替代微信实际送达。
+任务名称优先使用 Codex 数据库中的显式 `threads.name`，否则使用 Codex UI 的 `threads.title`；名称会限长并进行敏感值净化。
 
-## 本地开发
+## 一键使用
 
-```powershell
-npm test
-npm run check
-```
+首次运行 `configure-notifier.cmd`。它直接获取腾讯 iLink 二维码；扫码后给机器人发一条短消息建立会话上下文，四项定位值使用当前 Windows 用户的 DPAPI 保存到仓库外。
 
-## Windows 一键控制
-
-首次双击 `configure-notifier.cmd`，输入一次既有 OpenClaw account 和完整 target。它们由 Windows DPAPI 按当前用户加密，保存于仓库外的 `%LOCALAPPDATA%\CodexOpenClawNotifier\secure`。之后使用：
-
-- `start-notifier.cmd`：后台启动唯一的轻量 watcher。
-- `notifier-status.cmd`：查看运行状态和新 outbox 计数，不显示凭据或消息正文。
+- `start-notifier.cmd`：启动唯一隐藏 watcher。
+- `notifier-status.cmd`：显示运行状态和 outbox 计数，不显示凭据或消息正文。
 - `stop-notifier.cmd`：只停止该启动器记录的 watcher。
 
-启动器直接运行 `node src/index.mjs watch`，不经过 npm，不安装或启动第二套 OpenClaw/Gateway，也不创建服务、计划任务、代理或监听端口。运行数据使用新的 `%LOCALAPPDATA%\CodexOpenClawNotifier\live`，不会重放旧默认 outbox 中的历史失败事件。
+运行目录为 `%LOCALAPPDATA%\CodexWeChatNotifier`。
 
-`npm run service`、`npm run proxy`、Stop hook 和 CLI wrapper 仅保留作开发或阶段 4 验证，不属于当前生产路线。未来生产接入唯一候选仍是单个 watcher，可由 `npm run watch` 或等价的 `start-notifier.cmd` 启动，但两者不能并行；只有阶段 5 的真实现场验收完成、用户明确允许后才能长期运行。
+## 验证
 
-不要将 Codex `base_url` 切换到 `15722`；只有出现 watcher 与 wrapper 均漏报、而透明代理可复现覆盖的具体案例后，才可提出该变更并先取得用户确认。
+```powershell
+npm run check
+npm test
+```
+
+接手前阅读 [实施计划](docs/implementation-plan.md)、[交接说明](docs/claude-handoff.md)、[直连契约](docs/verified-ilink-contract.md)、[现场验收](docs/live-acceptance.md) 和 [受控接入](docs/codex-setup.md)。

@@ -1,8 +1,8 @@
 {
-  "name": "codex-openclaw-notifier",
+  "name": "codex-wechat-notifier",
   "version": "0.1.0",
   "private": true,
-  "description": "Durable local Codex task and API-error notification bridge for OpenClaw.",
+  "description": "Durable local Codex task and API-error notification bridge for WeChat iLink.",
   "type": "module",
   "scripts": {
     "start": "node src/index.mjs service",
@@ -11,9 +11,9 @@
     "watch": "node src/index.mjs watch",
     "cli": "node src/cli-wrapper.mjs",
     "test": "node --test",
-    "check": "node --check src/index.mjs && node --check src/notifier-service.mjs && node --check src/api-proxy.mjs && node --check src/cli-wrapper.mjs && node --check src/adapters/openclaw.mjs"
+    "check": "node --check src/index.mjs && node --check src/notifier-service.mjs && node --check src/api-proxy.mjs && node --check src/cli-wrapper.mjs && node --check src/thread-name.mjs && node --check src/adapters/ilink.mjs"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.5"
   }
 }

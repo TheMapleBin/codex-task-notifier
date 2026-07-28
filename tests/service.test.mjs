@@ -74,3 +74,18 @@ test("notification worker dispatches direct watcher events without an HTTP liste
     await service.close();
   }
 });
+
+test("notification service owns the optional adapter lifecycle", async () => {
+  const home = await temporaryDirectory();
+  const calls = [];
+  const adapter = {
+    name: "lifecycle",
+    start: async () => calls.push("start"),
+    send: async () => {},
+    close: async () => calls.push("close")
+  };
+  const service = createNotifierService(testConfig(home), { adapter });
+  await service.start({ listen: false });
+  await service.close();
+  assert.deepEqual(calls, ["start", "close"]);
+});

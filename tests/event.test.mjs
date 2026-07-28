@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createEvent, FINAL_OUTPUT_MAX_LENGTH, formatEventForDelivery } from "../src/event.mjs";
+import { createEvent, FINAL_OUTPUT_MAX_LENGTH, formatEventForDelivery, TASK_NAME_MAX_LENGTH } from "../src/event.mjs";
 
 test("event contract keeps only approved metadata", () => {
   const event = createEvent({
@@ -31,6 +31,21 @@ test("event contract keeps only approved metadata", () => {
   assert.doesNotMatch(formatEventForDelivery(event), /private|secret/i);
 });
 
+test("event contract formats a sanitized task name and uses a safe fallback", () => {
+  const named = createEvent({
+    source: "session-watcher",
+    kind: "turn_finished",
+    turnId: "turn-named",
+    taskName: `发布检查 token=private-value ${"x".repeat(200)}`
+  });
+  assert.ok(Array.from(named.taskName).length <= TASK_NAME_MAX_LENGTH);
+  assert.doesNotMatch(named.taskName, /private-value/);
+  assert.match(formatEventForDelivery(named), /名称: 发布检查 token=\[REDACTED\]/);
+
+  const unnamed = createEvent({ source: "session-watcher", kind: "turn_finished", turnId: "turn-unnamed" });
+  assert.match(formatEventForDelivery(unnamed), /名称: 未命名任务/);
+});
+
 test("event contract rejects unsupported sources and errors", () => {
   assert.throws(() => createEvent({ source: "webhook", kind: "api_error" }), /Unsupported event source/);
   assert.throws(() => createEvent({ source: "api-proxy", kind: "api_error", errorKind: "raw_message" }), /Unsupported errorKind/);
@@ -56,6 +71,28 @@ test("event contract sanitizes and truncates the final assistant output", () => 
 
   const formatted = formatEventForDelivery(event);
   assert.match(formatted, /输出:\n第一行\nAuthorization:/);
+});
+
+test("event contract removes internal memory citations from final assistant output", () => {
+  const event = createEvent({
+    source: "session-watcher",
+    kind: "turn_finished",
+    turnId: "turn-internal-metadata",
+    finalOutput: `用户可见结论。\n\n<oai-mem-citation>\n<citation_entries>\nMEMORY.md:1-2|note=[internal]\n</citation_entries>\n<rollout_ids>\ninternal-id\n</rollout_ids>\n</oai-mem-citation>`
+  });
+
+  assert.equal(event.finalOutput, "用户可见结论。");
+  assert.doesNotMatch(formatEventForDelivery(event), /oai-mem-citation|MEMORY\.md|rollout_ids/);
+});
+
+test("event contract preserves unrelated XML-like text", () => {
+  const event = createEvent({
+    source: "session-watcher",
+    kind: "turn_finished",
+    turnId: "turn-user-markup",
+    finalOutput: "保留 <details>普通内容</details>。"
+  });
+  assert.equal(event.finalOutput, "保留 <details>普通内容</details>。");
 });
 
 test("delivery omits the output section when no assistant output exists", () => {

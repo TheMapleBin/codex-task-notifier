@@ -43,6 +43,7 @@ test("session watcher carries only the latest assistant output for the current t
   await fs.mkdir(directory, { recursive: true });
   const rollout = path.join(directory, "rollout-output.jsonl");
   const lines = [
+    JSON.stringify({ type: "session_meta", payload: { id: "thread-output" } }),
     JSON.stringify({ type: "event_msg", payload: { type: "task_started", turn_id: "turn-output" } }),
     JSON.stringify({ type: "turn_context", payload: { cwd: "C:\\work\\demo", turn_id: "turn-output" } }),
     JSON.stringify({ type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "private prompt" }] } }),
@@ -52,11 +53,44 @@ test("session watcher carries only the latest assistant output for the current t
   ];
   await fs.writeFile(rollout, `${lines.join("\n")}\n`, "utf8");
   const events = [];
-  const watcher = createSessionWatcher({ sessionsDir: root, onEvent: async (event) => events.push(event) });
+  const resolved = [];
+  const watcher = createSessionWatcher({
+    sessionsDir: root,
+    onEvent: async (event) => events.push(event),
+    resolveTaskName: async (threadId) => { resolved.push(threadId); return "输出通知验收"; }
+  });
 
   assert.equal(await watcher.scanOnce(), 1);
   assert.equal(events[0].finalOutput, "final line one\nfinal line two");
+  assert.equal(events[0].taskName, "输出通知验收");
+  assert.deepEqual(resolved, ["thread-output"]);
   assert.doesNotMatch(events[0].finalOutput, /private prompt|draft output/);
+});
+
+test("session watcher resolves the task name only when the terminal event arrives", async () => {
+  const root = await temporaryDirectory();
+  const directory = path.join(root, "2026", "07", "28");
+  await fs.mkdir(directory, { recursive: true });
+  const rollout = path.join(directory, "rollout-late-title.jsonl");
+  await fs.writeFile(rollout, `${JSON.stringify({ type: "session_meta", payload: { id: "thread-late-title" } })}\n`, "utf8");
+  const events = [];
+  const resolved = [];
+  const watcher = createSessionWatcher({
+    sessionsDir: root,
+    onEvent: async (event) => events.push(event),
+    resolveTaskName: async (threadId) => { resolved.push(threadId); return "稍后生成的任务名称"; }
+  });
+
+  assert.equal(await watcher.scanOnce(), 0);
+  assert.deepEqual(resolved, []);
+  await fs.appendFile(rollout, `${JSON.stringify({
+    type: "event_msg",
+    payload: { type: "task_complete", turn_id: "turn-late-title" }
+  })}\n`, "utf8");
+
+  assert.equal(await watcher.scanOnce(), 1);
+  assert.equal(events[0].taskName, "稍后生成的任务名称");
+  assert.deepEqual(resolved, ["thread-late-title"]);
 });
 
 test("session watcher does not reuse assistant output across turns", async () => {

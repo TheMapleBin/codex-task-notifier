@@ -1,5 +1,5 @@
 # Codex Stop hook: enqueue a minimal local event without blocking the task.
-# It intentionally does not contact OpenClaw/WeChat directly.
+# It intentionally does not contact WeChat directly.
 $ErrorActionPreference = 'Stop'
 
 function Write-IncomingFallback {
@@ -33,9 +33,9 @@ try {
     $notifierHome = if ($env:CODEX_NOTIFY_HOME) {
         $env:CODEX_NOTIFY_HOME
     } elseif ($env:LOCALAPPDATA) {
-        Join-Path $env:LOCALAPPDATA 'CodexOpenClawNotifier'
+        Join-Path $env:LOCALAPPDATA 'CodexWeChatNotifier'
     } else {
-        Join-Path $env:USERPROFILE 'AppData\Local\CodexOpenClawNotifier'
+        Join-Path $env:USERPROFILE 'AppData\Local\CodexWeChatNotifier'
     }
 
     $turnId = if ($hookInput.ContainsKey('turn_id') -and $null -ne $hookInput.turn_id) {

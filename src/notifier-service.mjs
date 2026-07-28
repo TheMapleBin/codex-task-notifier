@@ -1,6 +1,6 @@
 import http from "node:http";
 
-import { createOpenClawAdapter } from "./adapters/openclaw.mjs";
+import { createIlinkAdapter } from "./adapters/ilink.mjs";
 import { createDryRunAdapter } from "./adapters/dry-run.mjs";
 import { createEvent, isTerminalOutcome } from "./event.mjs";
 import { Outbox } from "./outbox.mjs";
@@ -47,7 +47,8 @@ function readJsonBody(request) {
 }
 
 function selectAdapter(config) {
-  return config.adapter === "openclaw" ? createOpenClawAdapter(config) : createDryRunAdapter(config);
+  if (config.adapter === "ilink") return createIlinkAdapter(config);
+  return createDryRunAdapter(config);
 }
 
 export function createNotifierService(config, { adapter = selectAdapter(config), outbox = new Outbox(config) } = {}) {
@@ -78,6 +79,7 @@ export function createNotifierService(config, { adapter = selectAdapter(config),
   async function start({ listen = true } = {}) {
     await outbox.init();
     await outbox.importIncoming();
+    await adapter.start?.();
 
     if (listen) {
       server = http.createServer(async (request, response) => {
@@ -124,6 +126,7 @@ export function createNotifierService(config, { adapter = selectAdapter(config),
       await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
       server = null;
     }
+    await adapter.close?.();
   }
 
   const api = Object.freeze({
