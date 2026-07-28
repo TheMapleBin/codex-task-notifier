@@ -80,12 +80,21 @@ function control(action) {
   if (process.env.CODEX_NOTIFY_LIFECYCLE_CONTROL_LOG) {
     return fs.appendFile(process.env.CODEX_NOTIFY_LIFECYCLE_CONTROL_LOG, `${action}\n`, "utf8");
   }
-  const result = spawnSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", controlScript, "-Action", action], {
+  const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", controlScript, "-Action", action];
+  let result = spawnSync(process.env.CODEX_NOTIFY_POWERSHELL || "pwsh.exe", args, {
     cwd: repositoryRoot,
     encoding: "utf8",
     windowsHide: true,
     stdio: "ignore"
   });
+  if (result.error?.code === "ENOENT") {
+    result = spawnSync("powershell.exe", args, {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      windowsHide: true,
+      stdio: "ignore"
+    });
+  }
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`Notifier control action failed: ${action}`);
 }
