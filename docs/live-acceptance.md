@@ -23,4 +23,4 @@
 
 当前允许一个直接 iLink watcher，以及唯一的 `CodexWeChatNotifierLifecycle` 生命周期计划任务；不得启用代理、hook、wrapper、第二个 watcher、服务或其他计划任务。
 
-现场发现按 `codex.exe` 启停 watcher 会增加 iLink context 丢失概率。生命周期已收敛为登录启动一个常驻 watcher，启动器立即退出；同一任务离线积压只保留最新终态。稳定 UIN、更新游标和最新 context 已使用 DPAPI 整体加密持久化。完整停止 PID `23684`、启动 PID `25248` 后，未重新绑定即成功发送“重启免绑定复测”，用户确认微信实际收到。整机冷启动仍未实际关机验收。
+稳定 UIN、更新游标和最新 context 已使用 DPAPI 整体加密持久化。完整停止 PID `23684`、启动 PID `25248` 后，未重新绑定即成功发送“重启免绑定复测”，用户确认微信实际收到。基于该证据，生命周期恢复为轻量 supervisor 跟随 `codex.exe`：任一 Desktop/CLI 运行时启动 watcher，全部退出 30 秒后停止。整机冷启动仍未实际关机验收。

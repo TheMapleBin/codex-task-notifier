@@ -3,12 +3,13 @@
 ## 当前事实
 
 - 当前生产路径是直接腾讯 iLink。
-- 唯一 watcher 由 `start-notifier.cmd` 管理，并通过登录计划任务保持常驻；启动器立即退出，不存在常驻 supervisor。先运行状态命令，不要启动第二个。
+- 唯一 watcher 由 `start-notifier.cmd` 管理，并由登录计划任务中的轻量 supervisor 跟随 `codex.exe` 启停；全部 Codex 退出 30 秒后停止。先运行状态命令，不要启动第二个。
 - DPAPI schema 2 已配置，真实微信已确认收到直接 iLink 通知。
 - 45/45 自动化测试通过。
 - 2400 字符输出与 citation/rollout 尾部清理已完成软件验证和真实微信复验；用户确认内容完整且没有其他内部文字。
 - API 错误、中断和离线恢复尚未全部验收。
 - 稳定 UIN、更新游标和最新 context 已使用独立 DPAPI blob 持久化；完整 watcher 停止和换 PID 重启后，无绑定真实投递已通过。整机冷启动尚未现场验收，不得提前宣称通过。
+- 不得再次把 watcher 改为无条件常驻；当前用户明确要求 Desktop/CLI 关闭后 30 秒停止、启动时自动恢复。
 
 ## 禁止回退
 

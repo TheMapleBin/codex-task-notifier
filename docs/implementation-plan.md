@@ -19,7 +19,7 @@ Codex Desktop/CLI rollout JSONL
 | 发送路径调查 | 完成；选择直接 iLink |
 | 二维码和会话绑定 | 完成；schema 2 DPAPI 配置已生成 |
 | watcher/outbox/iLink adapter | 完成；软件测试通过 |
-| Desktop/CLI 生命周期 | 完成；登录启动一个常驻 watcher，启动器立即退出，无常驻 supervisor |
+| Desktop/CLI 生命周期 | 完成；轻量 supervisor 按 `codex.exe` 启动 watcher，全部退出 30 秒后停止 |
 | 正常完成真实投递 | 完成；用户确认收到两条通知 |
 | 内部 citation 清理 | 已修复并完成真实微信复验；2400 字符输出完整且无内部尾块 |
 | 安全任务名称 | 已实现；显式名称优先，prompt 副本被拒绝 |
