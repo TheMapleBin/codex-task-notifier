@@ -35,6 +35,10 @@ Codex Desktop/CLI rollout JSONL
 - 只有 watcher 与可选 CLI wrapper 都可复现漏报时，才讨论 `15722`，且必须先获用户批准。
 - 不新增第二个 watcher、Gateway、OpenClaw、服务或保活进程；只允许已记录的 `CodexWeChatNotifierLifecycle` 当前用户计划任务承担保活。
 
+## QQ Bot 迁移状态
+
+QQ Bot 迁移目前仅完成只读方案调查，尚未安装、配置或接入生产。分阶段计划见 [QQ Bot 迁移计划](qqbot-migration-plan.md)。在 QQ 的真实主动消息、重启免绑定、错误重试和用户收件验收全部通过前，生产 transport 继续保持直接微信 iLink。
+
 ## 下一步
 
 1. 继续观察更长周期和整机冷启动后的 ClawBot 保活。
