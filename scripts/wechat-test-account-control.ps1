@@ -153,7 +153,7 @@ function Invoke-Test {
         } | ConvertTo-Json -Depth 8 -Compress
         $startInfo = [Diagnostics.ProcessStartInfo]::new()
         $startInfo.FileName = $node.Source
-        $startInfo.ArgumentList.Add($smokePath)
+        $startInfo.Arguments = ('"{0}"' -f $smokePath.Replace('"', '\"'))
         $startInfo.WorkingDirectory = $RepositoryRoot
         $startInfo.UseShellExecute = $false
         $startInfo.CreateNoWindow = $true

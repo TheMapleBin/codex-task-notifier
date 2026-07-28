@@ -17,7 +17,7 @@
 
 ## 本机配置和实发
 
-运行 `configure-wechat-test-account.cmd`，在独立终端窗口中依次输入四个值。所有值都会用当前 Windows 用户的 DPAPI 加密，配置保存到 `%LOCALAPPDATA%\CodexWeChatNotifier\secure\wechat-test-account.dpapi.json`。
+运行 `configure-wechat-test-account.cmd`，在独立终端窗口中依次输入四个值。入口优先使用 PowerShell 7 (`pwsh.exe`)，仅在未安装时回退 Windows PowerShell。所有值都会用当前 Windows 用户的 DPAPI 加密，配置保存到 `%LOCALAPPDATA%\CodexWeChatNotifier\secure\wechat-test-account.dpapi.json`。
 
 然后运行 `test-wechat-test-account.cmd`。成功只能证明微信官方发送命令返回成功；仍需用户确认微信实际收到。状态可通过 `wechat-test-account-status.cmd` 查看，命令不会显示配置值。
 
