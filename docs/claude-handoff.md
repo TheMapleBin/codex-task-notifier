@@ -33,7 +33,7 @@
 4. 运行 `npm run check`、`npm test`、`git diff --check`。
 5. 只暂存本任务文件，本地提交，不 push；提交后刷新 GitNexus 索引。
 
-`sendmessage` 省略 context 时曾返回 HTTP 200 但微信未收到，禁止将该路径作为兜底。`KeepAlive` 的单次真实 API 调用已验证，长期延长与冷启动后首次通知仍需现场验收。
+`sendmessage` 省略 context 时曾返回 HTTP 200 但微信未收到，禁止将该路径作为兜底。`KeepAlive` 已完成约 4 分钟短窗口真实投递验收；更长周期与冷启动后首次通知仍需现场验收。
 
 ## 后续验收
 

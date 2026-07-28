@@ -25,7 +25,7 @@ Codex Desktop/CLI rollout JSONL
 | 安全任务名称 | 已实现；显式名称优先，prompt 副本被拒绝 |
 | API 错误、中断、离线恢复 | 尚未完成真实验收 |
 | iLink context 恢复 | DPAPI 会话恢复已通过进程重启真实验收；整机冷启动尚未验收 |
-| iLink context 保活 | 单次 getconfig/typing/cancel 真实协议验证通过；跨既往过期窗口的真实投递尚未验收 |
+| iLink context 保活 | 完成短窗口验收；未重新绑定，连续保活约 4 分钟后用户确认真实收到 |
 | 微信公众号测试号备用路径 | 真实投递通过；长变量被卡片截断且不能展开，不再作为生产 transport |
 
 ## 不可跨越的边界
@@ -37,7 +37,7 @@ Codex Desktop/CLI rollout JSONL
 
 ## 下一步
 
-1. 等待超过既往 context 失效窗口后，在 iLink 生产路径验证保活后的真实投递。
+1. 继续观察更长周期和整机冷启动后的 ClawBot 保活。
 2. 复验 2400 字输出和 outbox 离线恢复。
 3. 验收 CLI 非零/错误和用户中断。
 4. 寻找安全的 Desktop API 错误复现；找不到则保留未验收状态。

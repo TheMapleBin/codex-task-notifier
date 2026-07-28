@@ -18,6 +18,7 @@ Codex rollout JSONL -> watcher -> durable outbox -> WeChat iLink
 - 尚未完成：Desktop/API 可控错误、CLI 非零/API 错误、用户中断、微信离线后恢复的全部真实验收。
 - 微信公众号测试号 DPAPI 配置保留为备用；当前 iLink 路径不需要 OpenClaw 或 `account/target`。
 - 从未启用：OpenClaw、Gateway、`15722`、`base_url` 切换、Stop hook、生产 CLI wrapper 或新服务。唯一计划任务在用户登录时启动轻量 supervisor；watcher 只在 Codex Desktop/CLI 运行时存在。supervisor 每 30 秒执行一次 ClawBot `typing` 后立即 `cancel`，不保持可见的“正在输入”。
+- ClawBot 保活已通过短窗口真实验收：未重新发送“绑定”，连续保活约 4 分钟后主动发送成功，用户确认微信实际收到。整机冷启动和更长周期仍需后续观察。
 
 通知包含来源、项目、任务名称、状态、耗时、短任务 ID、净化错误类别/HTTP 状态和最后一条 assistant 输出。输出最多 2400 字符；完整、残缺或 HTML 转义的内部 citation/rollout 元数据，以及末尾独立行中的 `::git-commit`、`::created-thread`、`::code-comment` 会在截断前移除。正文中的普通 `::` 保留，明显 token、Cookie、认证头、密码和 secret 会被遮盖。
 
