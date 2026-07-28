@@ -5,10 +5,10 @@
 - 当前生产路径是直接腾讯 iLink。
 - 唯一 watcher 由 `start-notifier.cmd` 管理，并通过登录计划任务保持常驻；启动器立即退出，不存在常驻 supervisor。先运行状态命令，不要启动第二个。
 - DPAPI schema 2 已配置，真实微信已确认收到直接 iLink 通知。
-- 43/43 自动化测试通过。
+- 45/45 自动化测试通过。
 - 2400 字符输出与 citation/rollout 尾部清理已完成软件验证和真实微信复验；用户确认内容完整且没有其他内部文字。
 - API 错误、中断和离线恢复尚未全部验收。
-- iLink 重新连接后必须由用户先向机器人发送一条消息，这是协议限制；不要恢复按 `codex.exe` 启停，否则每次关闭 Codex 都会再次要求刷新 context。
+- 稳定 UIN、更新游标和最新 context 已使用独立 DPAPI blob 持久化；完整 watcher 停止和换 PID 重启后，无绑定真实投递已通过。整机冷启动尚未现场验收，不得提前宣称通过。
 
 ## 禁止回退
 
@@ -16,6 +16,7 @@
 - 不安装或恢复 OpenClaw、Gateway、`openclaw-weixin` channel；生产发送链路是仓库内置的 iLink adapter。
 - 不启用 Stop hook、生产 CLI wrapper、API proxy、第二个 service/watcher 或其他计划任务；唯一允许的是 `CodexWeChatNotifierLifecycle`。
 - 同一任务在 context 失效期间只保留最新待发终态，避免恢复后旧通知连续消耗新 context。
+- 不得将 `weixin-ilink-session.dpapi.json` 的解密内容、字段值或 helper stdin/stdout 写入日志、响应或 Git。
 - 不读取、输出、提交 bot token、context token、用户 ID、二维码材料、prompt、消息正文、源码或原始请求/响应。
 - 任务名称优先使用 `threads.name`，否则使用 Codex UI 的 `threads.title`，并进行限长和敏感值净化。
 - 子代理必须通过 `session_meta` 的 parent/thread source/agent path/source 标记过滤，不发送完成通知。

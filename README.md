@@ -13,7 +13,7 @@ Codex rollout JSONL -> watcher -> durable outbox -> WeChat iLink
 - 2026-07-28 已完成直接 iLink 真实验收：两个已捕获事件从 `pending` 进入 `delivered`，收件人确认微信实际收到，且通知包含最终 assistant 输出。
 - 2026-07-28 已完成 2400 字符输出与尾部净化复验：收件人确认通知内容完整，且末尾没有 citation/rollout 内部元数据。
 - 当前轻量 watcher 已配置；是否运行以 `notifier-status.cmd` 的实时结果为准。
-- 自动化验证为 43/43，覆盖直接 iLink、DPAPI 配置、outbox 重试、终态识别、子代理过滤、常驻生命周期、待发终态合并、敏感信息净化、残缺/转义内部元数据清理和安全任务名称。
+- 自动化验证为 45/45，覆盖直接 iLink、DPAPI 配置、加密会话恢复、outbox 重试、终态识别、子代理过滤、常驻生命周期、待发终态合并、敏感信息净化、残缺/转义内部元数据清理和安全任务名称。
 - 尚未完成：Desktop/API 可控错误、CLI 非零/API 错误、用户中断、微信离线后恢复的全部真实验收。
 - 从未启用：`15722`、`base_url` 切换、Stop hook、生产 CLI wrapper 或新服务。唯一计划任务在用户登录时启动一个常驻 watcher，不保留 supervisor 进程。
 
@@ -25,7 +25,7 @@ Codex rollout JSONL -> watcher -> durable outbox -> WeChat iLink
 
 ## 一键使用
 
-首次运行 `configure-notifier.cmd`。它直接获取腾讯 iLink 二维码；扫码后给机器人发一条短消息建立会话上下文，四项定位值使用当前 Windows 用户的 DPAPI 保存到仓库外。
+首次运行 `configure-notifier.cmd`。它直接获取腾讯 iLink 二维码；扫码后给机器人发一条短消息建立会话上下文，四项定位值使用当前 Windows 用户的 DPAPI 保存到仓库外。运行期还会将稳定 UIN、更新游标和最新会话 context 作为一个 DPAPI 加密 blob 保存，不写入仓库或日志。
 
 - `start-notifier.cmd`：启动唯一隐藏 watcher。
 - `notifier-status.cmd`：显示运行状态和 outbox 计数，不显示凭据或消息正文。
@@ -34,7 +34,7 @@ Codex rollout JSONL -> watcher -> durable outbox -> WeChat iLink
 - `auto-notifier-status.cmd`：查看自动模式、启动器和计划任务状态。
 - `disable-auto-notifier.cmd`：移除自动模式并停止 watcher。
 
-自动模式只新增一个当前用户登录计划任务。启动器拉起 watcher 后立即退出，生产态只保留一个 Node watcher。iLink 明确要求重新连接后由用户先向机器人发送一条消息，因此 watcher 不再随 `codex.exe` 启停，避免每次关闭 Codex 都丢失会话 context。
+自动模式只新增一个当前用户登录计划任务。启动器拉起 watcher 后立即退出，生产态只保留一个 Node watcher。DPAPI 会话恢复已通过一次完整 watcher 停止、换 PID 重启和无绑定真实微信投递；仍保持常驻以减少腾讯服务端主动失效或网络重连的机会。
 
 运行目录为 `%LOCALAPPDATA%\CodexWeChatNotifier`。
 

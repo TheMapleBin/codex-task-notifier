@@ -13,10 +13,10 @@ OpenClaw、Gateway、channel account/target 均不属于该契约，也不是运
 
 请求使用 `AuthorizationType: ilink_bot_token`、Bearer token、稳定的 `X-WECHAT-UIN` 和 channel version `1.0.2`。base URL 必须是微信 HTTPS 域名。HTTP/协议错误只记录净化类别或返回码，不记录响应正文。
 
-bot token、base URL、to-user ID 和 context token 由 `configure-notifier.cmd` 写入 Windows DPAPI 配置。启动器只向 watcher 子进程注入，不写入仓库、Codex 配置、命令行参数或日志。
+bot token、base URL、to-user ID 和初始 context token 由 `configure-notifier.cmd` 写入 Windows DPAPI 配置。运行期的稳定 UIN、更新游标、to-user ID 和最新 context token 由 `ilink-session-state.ps1` 整体加密为独立 DPAPI blob。敏感值只通过子进程 stdin/pipe 传递，不写入仓库、Codex 配置、命令行参数或日志。
 
-context 过期时，outbox 保持 pending；用户给机器人发送新消息后，长轮询在内存中刷新 context 并继续重试。
+watcher 启动时优先恢复 DPAPI 会话状态。现场已证明完整停止并换 PID 重启后，无需重新发送绑定消息即可直接投递。若腾讯服务端明确返回 context 过期，outbox 仍保持 pending；用户给机器人发送新消息后，长轮询刷新并重新加密 context。
 
-真实证据：扫码和“绑定”后配置升级为 schema 2、transport 为 `weixin-ilink`。启动 watcher 后，两条真实 Codex 完成事件从 `pending: 2` 变为 `delivered: 2`、`failed: 0`；收件人确认微信实际收到，并展示了 watcher 元数据和最终 assistant 输出。
+真实证据：扫码和“绑定”后配置升级为 schema 2、transport 为 `weixin-ilink`。启动 watcher 后，两条真实 Codex 完成事件从 `pending: 2` 变为 `delivered: 2`、`failed: 0`；收件人确认微信实际收到，并展示了 watcher 元数据和最终 assistant 输出。2026-07-28 又完成一次进程级恢复验收：加密状态更新后停止 PID `23684`，启动新 PID `25248`，期间未再次绑定；“重启免绑定复测”进入 `delivered: 29` 且用户粘贴确认微信实际收到。整机冷启动尚未实际关机验收。
 
 该证据证明直接 iLink 正常完成路径，不自动证明 API 错误、中断或离线恢复。
