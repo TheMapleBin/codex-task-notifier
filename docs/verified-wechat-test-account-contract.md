@@ -35,7 +35,7 @@
 
 ## 生产选择与回滚
 
-- 当前选择器：`%LOCALAPPDATA%\CodexWeChatNotifier\secure\active-transport.json`，值为 `wechat-test-account`，不含四项凭据。
+- 2026-07-28 因测试号卡片截断长变量且不能展开，用户决定生产切回 iLink；当前选择器值为 `weixin-ilink`，测试号配置保留备用。
 - 切换测试号：`use-wechat-test-account.cmd`。
 - 回滚直接 iLink：`use-ilink.cmd`。
 - iLink DPAPI 配置继续保留；切换 transport 不需要 OpenClaw、Gateway、代理或重复扫码。

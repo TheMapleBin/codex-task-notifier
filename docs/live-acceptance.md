@@ -23,7 +23,7 @@
 | 用户中断 | 未验收 |
 | 微信暂时离线后恢复 | 未验收 |
 
-当前允许一个 watcher，生产 transport 为微信公众号测试号，以及唯一的 `CodexWeChatNotifierLifecycle` 生命周期计划任务；不得启用代理、hook、wrapper、第二个 watcher、服务或其他计划任务。直接 iLink 配置只作为回滚保留。
+当前允许一个 watcher，生产 transport 为直接 iLink，以及唯一的 `CodexWeChatNotifierLifecycle` 生命周期计划任务；不得启用代理、hook、wrapper、第二个 watcher、服务或其他计划任务。微信公众号测试号配置保留为备用。
 
 两条 failed 是切换前已经耗尽最大尝试次数的旧 iLink 记录，outbox 在调用测试号 adapter 前即将其移入 failed。它们不构成测试号发送失败证据；未经用户明确授权，不读取正文、不重放、不删除。
 
