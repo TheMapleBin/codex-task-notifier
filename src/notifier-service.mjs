@@ -59,7 +59,7 @@ export function createNotifierService(config, { adapter = selectAdapter(config),
   async function submit(rawEvent) {
     const event = createEvent(rawEvent);
     if (isTerminalOutcome(event)) {
-      await outbox.supersedePending(event.correlationKey, ["turn_stopped"]);
+      await outbox.supersedePending(event.correlationKey, ["turn_stopped", "turn_finished", "turn_interrupted", "task_error"]);
     }
     const notBefore = event.kind === "turn_stopped" && config.stopHoldMs > 0
       ? new Date(Date.now() + config.stopHoldMs)

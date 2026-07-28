@@ -76,3 +76,14 @@ test("iLink adapter discards expired context and returns sanitized failure codes
     (error) => /context expired/.test(error.message) && !/sensitive upstream detail/.test(error.message)
   );
 });
+
+test("iLink adapter recognizes an expired context reported through errcode", async () => {
+  const adapter = createIlinkAdapter(config({ toUserId: "test-user", contextToken: "test-context" }), {
+    fetchImpl: async () => response({ errcode: -2, errmsg: "sensitive upstream detail" }),
+    randomBytes: () => Buffer.alloc(4, 1)
+  });
+  await assert.rejects(
+    () => adapter.send({ source: "session-watcher", kind: "turn_finished", surface: "desktop", turnId: "turn-expired-errcode" }),
+    (error) => /context expired/.test(error.message) && !/sensitive upstream detail/.test(error.message)
+  );
+});

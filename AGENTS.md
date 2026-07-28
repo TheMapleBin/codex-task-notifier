@@ -54,6 +54,8 @@ The current production path is one watcher with a built-in Tencent WeChat iLink 
 - Never notify subagent completion; filter session metadata carrying parent thread, subagent thread source, agent path, or subagent source markers.
 - Sanitize complete, orphaned, and HTML-escaped citation/rollout metadata before applying the final-output length limit.
 - The 2400-character output and metadata-tail sanitizer passed real WeChat display acceptance; do not reduce the limit or remove these filters without a new regression case.
+- Keep the single watcher resident after logon. iLink requires a user message after reconnect, so do not restore `codex.exe`-driven watcher shutdown or a persistent supervisor.
+- Coalesce pending terminal outcomes by correlation key so only the newest state for one task consumes a refreshed iLink context.
 - Do not change `C:\Users\TheMapleBin\.codex\config.toml`, `base_url`, or enable `15722`, Stop hook, production CLI wrapper, or API proxy.
 - A real acceptance case still requires event capture, outbox persistence, successful send, and user confirmation. API error, interruption, and offline recovery cases remain incomplete.
 - Keep changes scoped: inspect status/diff, stage only task files, commit locally, do not push, and refresh GitNexus after the commit.

@@ -131,12 +131,15 @@ export function createIlinkAdapter(config, { fetchImpl = globalThis.fetch, rando
         base_info: { channel_version: CHANNEL_VERSION }
       }, { botToken: settings.botToken, wechatUin, timeoutMs: settings.sendTimeoutMs, fetchImpl });
 
-      if (result?.ret === -2) {
+      const responseCode = Number.isInteger(result?.ret)
+        ? result.ret
+        : Number.isInteger(result?.errcode) ? result.errcode : null;
+      if (responseCode === -2) {
         context = null;
         throw new Error("iLink conversation context expired; send the bot one message to refresh it.");
       }
-      if (result?.ret === -14 || result?.errcode === -14) throw new Error("iLink authentication expired.");
-      if (Number.isInteger(result?.ret) && result.ret !== 0) throw new Error(`iLink send failed with code ${result.ret}.`);
+      if (responseCode === -14) throw new Error("iLink authentication expired.");
+      if (responseCode != null && responseCode !== 0) throw new Error(`iLink send failed with code ${responseCode}.`);
       return { transport: "weixin-ilink", exitCode: 0 };
     }
   });

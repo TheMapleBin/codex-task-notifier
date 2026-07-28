@@ -19,11 +19,12 @@ Codex Desktop/CLI rollout JSONL
 | 发送路径调查 | 完成；选择直接 iLink |
 | 二维码和会话绑定 | 完成；schema 2 DPAPI 配置已生成 |
 | watcher/outbox/iLink adapter | 完成；软件测试通过 |
-| Desktop/CLI 生命周期 | 完成；一个登录 supervisor 按 `codex.exe` 启停唯一 watcher |
+| Desktop/CLI 生命周期 | 完成；登录启动一个常驻 watcher，启动器立即退出，无常驻 supervisor |
 | 正常完成真实投递 | 完成；用户确认收到两条通知 |
 | 内部 citation 清理 | 已修复并完成真实微信复验；2400 字符输出完整且无内部尾块 |
 | 安全任务名称 | 已实现；显式名称优先，prompt 副本被拒绝 |
 | API 错误、中断、离线恢复 | 尚未完成真实验收 |
+| iLink context 恢复 | 已确认重新连接后需用户向机器人发一条消息；同一任务离线积压只保留最新终态 |
 
 ## 不可跨越的边界
 

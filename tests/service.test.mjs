@@ -75,6 +75,25 @@ test("notification worker dispatches direct watcher events without an HTTP liste
   }
 });
 
+test("notification worker keeps only the latest pending terminal event for one task", async () => {
+  const home = await temporaryDirectory();
+  const delivered = [];
+  const service = createNotifierService(testConfig(home), {
+    adapter: { name: "capture", send: async (event) => delivered.push(event) }
+  });
+  await service.start({ listen: false });
+  try {
+    await service.submit({ source: "session-watcher", kind: "task_error", turnId: "turn-coalesced", finalOutput: "older" });
+    await service.submit({ source: "session-watcher", kind: "turn_finished", turnId: "turn-coalesced", finalOutput: "latest" });
+    await service.tick();
+    assert.equal(delivered.length, 1);
+    assert.equal(delivered[0].kind, "turn_finished");
+    assert.equal(delivered[0].finalOutput, "latest");
+  } finally {
+    await service.close();
+  }
+});
+
 test("notification service owns the optional adapter lifecycle", async () => {
   const home = await temporaryDirectory();
   const calls = [];
