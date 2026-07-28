@@ -235,9 +235,12 @@ function Invoke-Test {
         $startInfo.RedirectStandardInput = $true
         $startInfo.RedirectStandardOutput = $true
         $startInfo.RedirectStandardError = $true
-        # Node reads the notification JSON as UTF-8. ProcessStartInfo otherwise
+        # Node exchanges JSON and diagnostics as UTF-8. ProcessStartInfo otherwise
         # uses the active Windows code page, which corrupts Chinese text.
-        $startInfo.StandardInputEncoding = [System.Text.UTF8Encoding]::new($false)
+        $utf8 = [System.Text.UTF8Encoding]::new($false)
+        $startInfo.StandardInputEncoding = $utf8
+        $startInfo.StandardOutputEncoding = $utf8
+        $startInfo.StandardErrorEncoding = $utf8
         $process = [Diagnostics.Process]::Start($startInfo)
         $process.StandardInput.WriteLine($payload)
         $process.StandardInput.Close()
