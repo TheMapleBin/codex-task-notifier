@@ -1,6 +1,6 @@
-# Codex 微信通知现场验收记录
+# Codex 通知现场验收记录
 
-每项必须分别证明：事件捕获、持久 outbox、发送成功、微信实际收到。测试绿灯、进程运行或 `delivered` 不能单独替代收件确认。
+每项必须分别证明：事件捕获、持久 outbox、发送成功、客户端实际收到。测试绿灯、进程运行或 `delivered` 不能单独替代收件确认。
 
 ## 已通过
 
@@ -11,6 +11,8 @@
 | 测试号模板正文渲染 | 通过 | 不适用 | 通过 | 通过 | 固定标签模板显示变量；单行分隔可显示多字段，但长变量会被卡片截断且不能展开 |
 | ClawBot 单次保活协议 | 不适用 | 不适用 | 通过 | 不适用 | 最新 DPAPI context 下 getconfig、typing、cancel 均 ret=0；不产生聊天消息 |
 | ClawBot 保活跨短期失效窗口 | 不适用 | 不适用 | 通过 | 通过 | 未重新绑定，约 4 分钟内每 30 秒保活；随后发送返回 message ID，用户确认收到 |
+| QQ Bot 原生 Gateway 独立实发 | 不适用 | 不适用 | 通过 | 通过 | Gateway online、API 返回 message ID，用户确认 QQ 客户端收到 |
+| QQ Bot watcher 同进程 adapter 实发 | 不适用 | 不适用 | 通过 | 通过 | adapter 等待 Gateway READY 后发送并关闭，用户第二次确认 QQ 客户端收到 |
 
 直接 iLink 验收期间未修改 `C:\Users\TheMapleBin\.codex\config.toml`、`base_url` 或 `15722`。
 
@@ -23,10 +25,12 @@
 | Desktop API 错误 | 未验收；不得通过修改全局配置或认证制造 |
 | CLI 非零或 API 错误 | 未验收 |
 | 用户中断 | 未验收 |
-| 微信暂时离线后恢复 | 未验收 |
+| QQ Gateway/API 暂时离线后恢复 | 未验收；自动化已证明 watcher 继续入队、发送等待 READY |
 | ClawBot 长周期与整机冷启动后投递 | 未验收；短窗口约 4 分钟已通过，不外推为无限期有效 |
 
-当前允许一个 watcher，生产 transport 为直接 iLink，以及唯一的 `CodexWeChatNotifierLifecycle` 生命周期计划任务；不得启用代理、hook、wrapper、第二个 watcher、服务或其他计划任务。微信公众号测试号配置保留为备用。
+2026-07-29 生产 selector 已切换为 QQ Bot：唯一 watcher 内嵌原生 QQ Gateway，唯一 `CodexWeChatNotifierLifecycle` supervisor 正常运行，iLink keepalive 为 `not used`。不得启用代理、hook、wrapper、第二个 watcher、OpenClaw Gateway、服务或其他计划任务。微信 iLink 与微信公众号测试号配置保留为回滚。
+
+切换现场旧 outbox 为 `legacy=79`、`ilink=5`、`qqbot=0`；transport pinning 保证这 84 条历史 pending 原地保留且不会通过 QQ 重放。切换后 `Delivered` 保持 68、`Failed` 保持 2，没有历史通知洪发。当前真实 Codex 根任务结束通知仍待用户确认，确认前不得把 watcher 端到端用例标为通过。
 
 两条 failed 是切换前已经耗尽最大尝试次数的旧 iLink 记录，outbox 在调用测试号 adapter 前即将其移入 failed。它们不构成测试号发送失败证据；未经用户明确授权，不读取正文、不重放、不删除。
 

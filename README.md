@@ -1,24 +1,25 @@
-# Codex WeChat Notifier
+# Codex Task Notifier
 
-Windows 上的轻量 Codex Desktop/CLI 任务终态通知器。当前生产路径由一个轻量 lifecycle supervisor 和按需 Node watcher 组成：watcher 读取 Codex rollout JSONL，写入持久 outbox，并直接调用腾讯微信 iLink API；supervisor 在 watcher 关闭期间继续维持 ClawBot 会话。
+Windows 上的轻量 Codex Desktop/CLI 任务终态通知器。当前生产路径由一个轻量 lifecycle supervisor 和按需 Node watcher 组成：watcher 读取 Codex rollout JSONL、写入持久 outbox，并在同一 Node 进程内维持原生 QQ Gateway 后调用 QQ Bot HTTPS API。没有 OpenClaw 或第二个 Gateway 服务。
 
 ```text
-Codex rollout JSONL -> watcher -> durable outbox -> WeChat iLink
+Codex rollout JSONL -> watcher + native QQ Gateway -> durable outbox -> QQ Bot
 ```
 
 不需要额外消息网关、`account/target`、HTTP 代理、Codex hook 或 CLI 注入。
 
 ## 当前状态
 
-- 2026-07-28 测试号模板路径完成真实验收后，因卡片长文本会截断且不能展开，生产 adapter 已按用户决定切回直接 iLink。
+- 2026-07-29 QQ Bot 已完成两次真实主动消息验收：原生 Gateway `READY`、QQ API 返回消息 ID、QQ 客户端两次实际收到。生产 transport 已按用户确认从 iLink 切换为 QQ Bot。
 - 切换后的现场状态为 `Pending: 0`、`Delivered: 40`、`Failed: 2`。两条 failed 是切换前已经耗尽重试次数的旧 iLink 记录，未读取正文、未重放、未删除。
 - 2026-07-28 已完成 2400 字符输出与 citation/rollout 尾部净化复验，并增加末尾 Codex UI 指令的受限白名单清理。
-- 当前轻量 watcher 已配置；是否运行以 `notifier-status.cmd` 的实时结果为准。
+- 当前轻量 watcher 已配置；是否运行以 `notifier-status.cmd` 的实时结果为准。QQ transport 下 `QQ Gateway: online` 才表示发送门禁就绪，客户端收件仍以用户确认优先。
 - 自动化验证覆盖直接 iLink、微信公众号测试号备用 adapter、DPAPI 配置、加密会话恢复、ClawBot 心跳、outbox 重试、终态识别、子代理过滤、跟随 Codex 的生命周期、待发终态合并、敏感信息净化、残缺/转义内部元数据、尾部 Codex UI 指令清理和安全任务名称。
 - 尚未完成：Desktop/API 可控错误、CLI 非零/API 错误、用户中断、微信离线后恢复的全部真实验收。
-- 微信公众号测试号 DPAPI 配置保留为备用；当前 iLink 路径不需要 OpenClaw 或 `account/target`。
+- 微信 iLink 与微信公众号测试号 DPAPI 配置保留为回滚，不删除、不自动重放。QQ Bot 同样不需要 OpenClaw 或 `account/target`。
 - 从未启用：OpenClaw（及其 Gateway）、`15722`、`base_url` 切换、Stop hook、生产 CLI wrapper 或新服务。唯一计划任务在用户登录时启动轻量 supervisor；watcher 只在 Codex Desktop/CLI 运行时存在。supervisor 每 30 秒执行一次 ClawBot `typing` 后立即 `cancel`，不保持可见的“正在输入”。
-- QQ Bot 直连 adapter 与最小原生 Gateway 在线守护已完成本地实现和单元测试：日常投递只用 QQ HTTPS API，Gateway 只维持官方 WebSocket 在线、心跳/重连与脱敏权限状态；不依赖 OpenClaw。当前未切换生产。完整门禁见 [QQ Bot 直连迁移计划](docs/qqbot-migration-plan.md) 和 [原生 Gateway 操作说明](docs/qqbot-native-gateway.md)。
+- QQ Bot adapter 与最小原生 Gateway 已接入同一个 watcher 生命周期：Codex 启动时跟随 watcher 启动，Codex 全部退出 30 秒后一起停止；DPAPI 绑定跨重启保留。Gateway 离线时任务仍进入 outbox，恢复 `READY` 后重试。
+- outbox 记录固定到入队时的 transport。2026-07-29 切换时现场发现 `legacy=79`、`ilink=5` 条历史 pending；它们保留原地且不会通过 QQ 重放。新 QQ 记录只由 QQ adapter 处理。
 - ClawBot 保活已通过短窗口真实验收：未重新发送“绑定”，连续保活约 4 分钟后主动发送成功，用户确认微信实际收到。整机冷启动和更长周期仍需后续观察。
 
 通知包含来源、项目、任务名称、状态、耗时、短任务 ID、净化错误类别/HTTP 状态和最后一条 assistant 输出。输出最多 2400 字符；完整、残缺或 HTML 转义的内部 citation/rollout 元数据，以及末尾独立行中的 `::git-commit`、`::created-thread`、`::code-comment` 会在截断前移除。正文中的普通 `::` 保留，明显 token、Cookie、认证头、密码和 secret 会被遮盖。
@@ -29,7 +30,7 @@ Codex rollout JSONL -> watcher -> durable outbox -> WeChat iLink
 
 ## 一键使用
 
-当前生产首次配置运行 `configure-notifier.cmd`，扫码后给 ClawBot 发一条短消息建立会话。切换回 iLink 使用 `use-ilink.cmd`；测试号备用路径使用 `use-wechat-test-account.cmd`。
+QQ 首次配置使用 `bind-qqbot.cmd`，只需向机器人发送一次“绑定”。生产切换使用 `use-qqbot.cmd`；回滚 iLink 使用 `use-ilink.cmd`；测试号备用路径使用 `use-wechat-test-account.cmd`。
 
 - `start-notifier.cmd`：启动唯一隐藏 watcher。
 - `notifier-status.cmd`：显示运行状态和 outbox 计数，不显示凭据或消息正文。
@@ -38,9 +39,9 @@ Codex rollout JSONL -> watcher -> durable outbox -> WeChat iLink
 - `auto-notifier-status.cmd`：查看自动模式、supervisor 和计划任务状态。
 - `disable-auto-notifier.cmd`：移除自动模式并停止 supervisor 与 watcher。
 
-QQ Bot 使用 `bind-qqbot.cmd` 完成一次性绑定：它只在本次操作中短暂连接官方 QQ Gateway，等你向机器人发“绑定”后立即将 OpenID 加密保存并退出。无法绑定时也可用 `configure-qqbot.cmd` 手工加密配置；`qqbot-status.cmd` 查看是否已配置，`start-qqbot-gateway.cmd` / `stop-qqbot-gateway.cmd` 显式管理最小原生在线连接，`qqbot-gateway-status.cmd` 查看其脱敏状态，`test-qqbot.cmd` 做一次独立短消息实发。它们都不会改变当前 iLink 生产 transport。不得在未经现场验收和明确确认的情况下手工把 watcher 切到 QQ。
+QQ Bot 使用 `bind-qqbot.cmd` 完成一次性绑定：它只在本次操作中短暂连接官方 QQ Gateway，等你向机器人发“绑定”后立即将 OpenID 加密保存并退出。`test-qqbot.cmd` 会在同一短命进程中连接 Gateway、发送、关闭，用于独立验收。`start-qqbot-gateway.cmd` 等命令只保留为诊断工具，生产模式不运行该独立进程。
 
-自动模式只新增一个当前用户登录计划任务和一个轻量 supervisor。Codex Desktop/CLI 任一运行时启动 watcher；全部退出 30 秒后停止 watcher。iLink 凭据和最新会话状态持久保存在 DPAPI 中；supervisor 在 watcher 停止期间用同一会话执行低占空比保活。`notifier-status.cmd` 会显示最近一次 `ClawBot keepalive` 状态。
+自动模式沿用原有的一个当前用户登录计划任务和一个轻量 supervisor。Codex Desktop/CLI 任一运行时启动 watcher 与内置 QQ Gateway；全部退出 30 秒后一起停止。QQ 凭据和目标由当前 Windows 用户 DPAPI 持久保存，不需要每次重新绑定。QQ transport 下 iLink/ClawBot keepalive 为 `not used`，不会发起微信保活请求。
 
 运行目录为 `%LOCALAPPDATA%\CodexWeChatNotifier`。
 

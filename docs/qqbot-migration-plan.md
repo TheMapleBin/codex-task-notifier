@@ -16,13 +16,13 @@ Codex Desktop / CLI rollout JSONL
   -> 仅记录主动消息允许或拒绝状态
 ```
 
-首次取得用户 `openid` 时，需要短暂运行一次独立的 QQ Gateway 绑定器；绑定后 `openid` 会和 AppID/AppSecret 一起 DPAPI 加密。日常投递仍只使用 HTTPS，但 QQ 平台要求机器人保持 Gateway 在线，因此另有一个不含 OpenClaw 的原生 Gateway 守护进程。它不读取或持久化聊天正文、OpenID、token 或原始事件。
+首次取得用户 `openid` 时，需要短暂运行一次独立的 QQ Gateway 绑定器；绑定后 `openid` 会和 AppID/AppSecret 一起 DPAPI 加密。生产日常投递由同一个 watcher 进程同时维持 Gateway 在线并调用 HTTPS，不再运行独立守护进程。它不读取或持久化聊天正文、OpenID、token 或原始事件。
 
 ## 当前边界
 
-- 当前生产 transport 仍为直接微信 iLink；本计划尚未授权切换它。
+- 2026-07-29 用户已确认两次 QQ 客户端真实收件，并明确授权继续切换生产。
 - 不删除 iLink、微信公众号测试号配置、已有 DPAPI 状态、旧 outbox 记录或用户已有脏工作树修改。
-- 不修改 `C:\Users\TheMapleBin\.codex\config.toml`、`base_url`、`15722`，不新增 watcher、代理、hook 或计划任务。原生 QQ Gateway 是单独、可显式启动和停止的轻量在线进程，尚未接入生产生命周期。
+- 不修改 `C:\Users\TheMapleBin\.codex\config.toml`、`base_url`、`15722`，不新增 watcher、代理、hook 或计划任务。原生 QQ Gateway 已接入现有 watcher 生命周期。
 - 不读取、输出、提交或写日志记录 AppSecret、access token、openid、二维码凭据、消息正文或原始请求/响应正文。
 - 不通知子代理；沿用现有根任务过滤、去重、任务名称解析、2400 字输出上限和末尾元数据净化。
 - HTTP 成功、SDK 返回、outbox `delivered` 或进程运行都不能单独证明 QQ 客户端实际收到；必须由收件人确认。
@@ -40,18 +40,18 @@ Codex Desktop / CLI rollout JSONL
 
 QQ 平台仍可能存在额度或频率限制，无法从 SDK 推导固定的全局数字；429 必须按真实响应处理，不能被当作永久成功或无限配额。
 
-## 已实现但尚未上线的内容
+## 已实现并进入生产接入的内容
 
 - `src/adapters/qqbot.mjs`：原生 `fetch` 的 C2C 主动消息 adapter；无 npm 运行依赖、无 OpenClaw 子进程。
 - `src/qqbot-config.mjs` 与 `scripts/qqbot-config.ps1`：只从当前 Windows 用户 DPAPI 读取 AppID、AppSecret、openid。
 - `bind-qqbot.cmd`：一次性原生 QQ Gateway 绑定器，收到一条 C2C 消息后直接 DPAPI 加密保存 OpenID 并退出；不使用 OpenClaw。
 - `configure-qqbot.cmd`、`qqbot-status.cmd`、`test-qqbot.cmd`：手工配置、只读状态、一次短消息 smoke test；均不改当前生产 transport。
-- `start-qqbot-gateway.cmd`、`stop-qqbot-gateway.cmd`、`qqbot-gateway-status.cmd`：原生 Gateway 的显式启动、停止和脱敏状态查看；它们不启动 watcher，也不会改变生产 transport。
+- `start-qqbot-gateway.cmd`、`stop-qqbot-gateway.cmd`、`qqbot-gateway-status.cmd`：只保留为独立诊断工具；生产 watcher 不依赖这些进程。
 - `src/qqbot-gateway.mjs`：官方 Gateway Identify、heartbeat、指数退避重连和 `C2C_MSG_RECEIVE` / `C2C_MSG_REJECT` 脱敏状态记录。
 - token 缓存、401 刷新一次、超时、离线、429 Retry-After、不可重试拒绝和敏感信息不外泄的单元测试。
 - outbox 新增 `retryable=false` 和 `retryAfterMs` 的受限处理；既有 iLink context 过期路径不变。
 
-仍未完成：真实 QQ Gateway 在线、真实 C2C 实发、重启后复测、watcher 实发和生产切换。没有这些现场证据前，不能宣称 QQ 已接入生产。
+已完成：绑定后免重新绑定、原生 Gateway 两次在线、两次 C2C 主动发送取得消息 ID、用户两次确认 QQ 客户端实收、生产 selector 与 watcher 同进程接入。仍待当前真实 Codex 任务完成后确认 watcher 端到端收件，以及 Desktop/API 错误、CLI 非零、用户中断和离线恢复等完整用例。
 
 ## 后续阶段与门禁
 
@@ -90,9 +90,9 @@ QQ 平台仍可能存在额度或频率限制，无法从 SDK 推导固定的全
 
 每项必须分开记录：事件捕获、已入 outbox、发送命令成功、QQ 客户端实际收到。
 
-### 阶段 4：生产切换（需再次明确确认）
+### 阶段 4：生产切换（已授权，执行中）
 
-只有阶段 1-3 全部完成后，才允许将现有 transport selector 从 iLink 切到 `qqbot`。切换时保持同一 watcher、同一 lifecycle supervisor 和同一登录计划任务；不创建第二套常驻体系。首次运行必须观察 pending、delivered、failed、429 和 token 刷新。任何关键验收失败立即切回 iLink。
+生产 selector 已切换为 `qqbot`，保持同一 watcher、同一 lifecycle supervisor 和同一登录计划任务；没有创建第二套常驻体系。切换前新增 transport pinning：旧 iLink/legacy pending 原地保留，不通过 QQ 重放。任何关键验收失败立即用 `use-ilink.cmd` 回滚。
 
 ## 回滚条件
 

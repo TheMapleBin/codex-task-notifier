@@ -2,9 +2,9 @@
 
 ## 目的与边界
 
-QQ Bot 的 C2C 主动消息仍由 `src/adapters/qqbot.mjs` 通过官方 HTTPS 接口发送；这个小进程只保持官方 QQ WebSocket Gateway 在线，以满足平台对机器人在线状态的要求。它不是 OpenClaw，也不启动 OpenClaw Gateway、HTTP 代理、第二个 watcher、hook 或计划任务。
+QQ Bot 的 C2C 主动消息由 `src/adapters/qqbot.mjs` 通过官方 HTTPS 接口发送；原生 QQ WebSocket Gateway 默认内嵌在同一个 watcher 进程中，以满足平台对机器人在线状态的要求。它不是 OpenClaw，也不启动 OpenClaw Gateway、HTTP 代理、第二个 watcher、hook 或计划任务。
 
-当前生产 transport 仍是微信 iLink。本组件完成本地实现和单独现场验证前，不得把 watcher 改为 QQ Bot。
+2026-07-29 已完成两次 QQ 客户端实收并经用户确认，生产 transport 已获授权切换到 QQ Bot。微信 iLink 配置只作为回滚保留。
 
 ## 安全契约
 
@@ -18,13 +18,15 @@ QQ Bot 的 C2C 主动消息仍由 `src/adapters/qqbot.mjs` 通过官方 HTTPS �
 1. 读取 DPAPI 配置，获取临时 AppAccessToken 和官方 Gateway URL。
 2. 用 `GROUP_AND_C2C_EVENT` intent 进行 Identify，按服务端给出的心跳间隔发送 heartbeat。
 3. 普通断开、网络/限流/上游短暂故障采用 1 秒至 60 秒指数退避重连；鉴权错误或未启用 intent 进入 `blocked`，不无限重试。
-4. 连接状态按 `starting`、`connecting`、`online`、`backoff`、`blocked`、`stopped` 写入脱敏状态文件。
+4. 只有收到官方 `READY` dispatch 后才进入 `online` 并允许 HTTPS 投递；仅收到 `HELLO` 不算就绪。
+5. 连接状态按 `starting`、`connecting`、`online`、`backoff`、`blocked`、`stopped` 写入脱敏状态文件。
+6. watcher 启动不等待 QQ 在线，因此离线期间仍能捕获任务并持久入队；实际发送会等待 `READY`，失败后由 outbox 退避重试。
 
 它没有保存或复用 Gateway session/resume token；每次重连重新取得短期 token 并 Identify，保持实现最小且不把会话凭据落盘。
 
 ## 手工验收
 
-以下命令都只操作原生 QQ Gateway，不改变 iLink watcher 的生产 transport：
+以下独立 Gateway 命令只用于诊断。生产运行时不要另开它们，因为 watcher 已在同一进程内维护 Gateway：
 
 1. 双击 `start-qqbot-gateway.cmd`。
 2. 双击 `qqbot-gateway-status.cmd`，确认 `Running: yes` 与 `Gateway state: online`。
