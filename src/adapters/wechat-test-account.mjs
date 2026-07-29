@@ -25,7 +25,6 @@ function failureCode(payload, status) {
 async function requestJson(url, options, { fetchImpl, timeoutMs, operation }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  timer.unref?.();
   try {
     let response;
     try {
