@@ -1,5 +1,5 @@
 {
-  "name": "codex-wechat-notifier",
+  "name": "codex-task-notifier",
   "version": "0.1.0",
   "private": true,
   "description": "Durable local Codex task and API-error notification bridge with direct transports.",

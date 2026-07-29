@@ -1,6 +1,6 @@
 # 微信公众号测试号接入
 
-该路径曾于 2026-07-28 短暂升级为生产 transport；真实客户端证明长变量会被模板卡片截断且不能展开后，生产已切回 iLink。测试号 DPAPI 配置继续保留为备用。
+该路径曾于 2026-07-28 短暂升级为生产 transport；真实客户端证明长变量会被模板卡片截断且不能展开后，生产先切回 iLink，并于 2026-07-29 切换到 QQ Bot。测试号 DPAPI 配置继续保留为备用。
 
 ## 平台配置
 
@@ -17,9 +17,9 @@
 
 ## 本机配置和实发
 
-运行 `configure-wechat-test-account.cmd`，在独立终端窗口中依次输入四个值。入口优先使用 PowerShell 7 (`pwsh.exe`)，仅在未安装时回退 Windows PowerShell。所有值都会用当前 Windows 用户的 DPAPI 加密，配置保存到 `%LOCALAPPDATA%\CodexWeChatNotifier\secure\wechat-test-account.dpapi.json`。
+运行 `commands/configure-wechat-test-account.cmd`，在独立终端窗口中依次输入四个值。入口优先使用 PowerShell 7 (`pwsh.exe`)，仅在未安装时回退 Windows PowerShell。所有值都会用当前 Windows 用户的 DPAPI 加密，配置保存到 `%LOCALAPPDATA%\CodexWeChatNotifier\secure\wechat-test-account.dpapi.json`。
 
-然后运行 `test-wechat-test-account.cmd`。成功只能证明微信官方发送命令返回成功；仍需用户确认微信实际收到。状态可通过 `wechat-test-account-status.cmd` 查看，命令不会显示配置值。
+然后运行 `commands/test-wechat-test-account.cmd`。成功只能证明微信官方发送命令返回成功；仍需用户确认微信实际收到。状态可通过 `commands/wechat-test-account-status.cmd` 查看，命令不会显示配置值。
 
 ## 阶段门禁
 

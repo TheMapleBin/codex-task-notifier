@@ -14,7 +14,7 @@ OpenClaw、Gateway、channel account/target 均不属于该契约，也不是运
 
 请求使用 `AuthorizationType: ilink_bot_token`、Bearer token、稳定的 `X-WECHAT-UIN` 和 channel version `1.0.2`。base URL 必须是微信 HTTPS 域名。HTTP/协议错误只记录净化类别或返回码，不记录响应正文。
 
-bot token、base URL、to-user ID 和初始 context token 由 `configure-notifier.cmd` 写入 Windows DPAPI 配置。运行期的稳定 UIN、更新游标、to-user ID 和最新 context token 由 `ilink-session-state.ps1` 整体加密为独立 DPAPI blob。敏感值只通过子进程 stdin/pipe 传递，不写入仓库、Codex 配置、命令行参数或日志。
+bot token、base URL、to-user ID 和初始 context token 由 `commands/configure-notifier.cmd` 写入 Windows DPAPI 配置。运行期的稳定 UIN、更新游标、to-user ID 和最新 context token 由 `ilink-session-state.ps1` 整体加密为独立 DPAPI blob。敏感值只通过子进程 stdin/pipe 传递，不写入仓库、Codex 配置、命令行参数或日志。
 
 watcher 启动时优先恢复 DPAPI 会话状态。现场已证明完整停止并换 PID 重启后，无需重新发送绑定消息即可直接投递。若腾讯服务端明确返回 context 过期，outbox 仍保持 pending；用户给机器人发送新消息后，长轮询刷新并重新加密 context。
 

@@ -28,11 +28,11 @@ QQ Bot 的 C2C 主动消息由 `src/adapters/qqbot.mjs` 通过官方 HTTPS 接�
 
 以下独立 Gateway 命令只用于诊断。生产运行时不要另开它们，因为 watcher 已在同一进程内维护 Gateway：
 
-1. 双击 `start-qqbot-gateway.cmd`。
-2. 双击 `qqbot-gateway-status.cmd`，确认 `Running: yes` 与 `Gateway state: online`。
+1. 双击 `commands/start-qqbot-gateway.cmd`。
+2. 双击 `commands/qqbot-gateway-status.cmd`，确认 `Running: yes` 与 `Gateway state: online`。
 3. 若 `Active messages: unknown`，它只表示“开启主动消息”的事件发生在 Gateway 启动前，不能据此推断权限失效。若需要用事件确认状态，可在 Gateway 在线时在 QQ 资料卡关闭再开启一次“主动消息”；无需重新绑定，也不需要重新输入凭据。
-4. 运行 `test-qqbot.cmd`，并由收件人在 QQ 客户端确认实际收到。官方消息 ID 回执只证明 API 接受，不能替代客户端确认。
-5. 运行 `stop-qqbot-gateway.cmd`，再执行 `qqbot-gateway-status.cmd`，确认 `Running: no`。这一步不会删除绑定或 DPAPI 配置。
+4. 运行 `commands/test-qqbot.cmd`，并由收件人在 QQ 客户端确认实际收到。官方消息 ID 回执只证明 API 接受，不能替代客户端确认。
+5. 运行 `commands/stop-qqbot-gateway.cmd`，再执行 `commands/qqbot-gateway-status.cmd`，确认 `Running: no`。这一步不会删除绑定或 DPAPI 配置。
 
 ## 失败处理
 

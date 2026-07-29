@@ -1,4 +1,2 @@
 @echo off
-setlocal
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\notifier-lifecycle.ps1" -Action Status
-pause
+call "%~dp0commands\auto-notifier-status.cmd"

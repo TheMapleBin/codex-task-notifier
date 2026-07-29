@@ -3,7 +3,7 @@
 ## 当前事实
 
 - 当前生产路径是直接 QQ Bot：唯一 watcher 内嵌原生 QQ Gateway，并调用官方 QQ HTTPS API；没有 OpenClaw。
-- 唯一 watcher 由 `start-notifier.cmd` 管理，并由登录计划任务中的轻量 supervisor 跟随 `codex.exe` 启停；全部 Codex 退出 30 秒后 watcher 与 QQ Gateway 一起停止。先运行状态命令，不要启动独立生产 Gateway 或第二个 watcher。
+- 唯一 watcher 可由 `commands/start-notifier.cmd` 手工管理，并由登录计划任务中的轻量 supervisor 跟随 `codex.exe` 启停；全部 Codex 退出 30 秒后 watcher 与 QQ Gateway 一起停止。先运行状态命令，不要启动独立生产 Gateway 或第二个 watcher。
 - QQ、iLink 和测试号配置均使用当前 Windows 用户 DPAPI 保存；当前选择器为 `qqbot`。iLink/testing 配置只保留回滚。
 - 82/82 自动化测试通过；QQ 独立及 watcher 同进程 smoke 各完成一次客户端实收确认。
 - 2400 字符输出与 citation/rollout 尾部清理已完成真实微信复验。随后发现末尾 `::git-commit{...}` 仍会外泄，现已增加 Codex UI 指令白名单清理，等待下一条真实微信通知复验。
@@ -33,7 +33,7 @@
 4. 运行 `npm run check`、`npm test`、`git diff --check`。
 5. 只暂存本任务文件，本地提交，不 push；提交后刷新 GitNexus 索引。
 
-QQ adapter 必须等待 Gateway `READY` 且发送响应包含消息 ID；`HELLO`、进程存在或 HTTP 状态不能单独当作收件成功。用户已两次确认 QQ 客户端实收，当前真实 watcher 根任务仍需确认。
+QQ adapter 必须等待 Gateway `READY` 且发送响应包含消息 ID；`HELLO`、进程存在或 HTTP 状态不能单独当作收件成功。用户已确认独立发送、同进程 adapter 发送和真实 watcher 根任务通知均在 QQ 客户端收到。
 
 ## 后续验收
 

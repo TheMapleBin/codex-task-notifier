@@ -324,15 +324,15 @@ function Invoke-Start {
     $transport = Get-SelectedTransport -Paths $Paths
     if ($transport -eq 'qqbot') {
         if (-not (Test-Path -LiteralPath $Paths.QQBotConfigPath)) {
-            throw 'QQ Bot is not configured. Run bind-qqbot.cmd or configure-qqbot.cmd once.'
+            throw 'QQ Bot is not configured. Run bind-qqbot.cmd or commands/configure-qqbot.cmd once.'
         }
         $config = Get-Content -LiteralPath $Paths.QQBotConfigPath -Raw | ConvertFrom-Json
         if ($config.schemaVersion -ne 1 -or $config.transport -ne 'qqbot' -or -not $config.appId -or -not $config.appSecret -or -not $config.openId) {
-            throw 'QQ Bot configuration is invalid. Run bind-qqbot.cmd or configure-qqbot.cmd again.'
+            throw 'QQ Bot configuration is invalid. Run bind-qqbot.cmd or commands/configure-qqbot.cmd again.'
         }
     } elseif ($transport -eq 'wechat-test-account') {
         if (-not (Test-Path -LiteralPath $Paths.TestAccountConfigPath)) {
-            throw 'WeChat test account is not configured. Run configure-wechat-test-account.cmd once.'
+            throw 'WeChat test account is not configured. Run commands/configure-wechat-test-account.cmd once.'
         }
         $config = Get-Content -LiteralPath $Paths.TestAccountConfigPath -Raw | ConvertFrom-Json
         if ($config.schemaVersion -ne 1 -or $config.transport -ne 'wechat-test-account' -or -not $config.appId -or -not $config.appSecret -or -not $config.openId -or -not $config.templateId) {
@@ -340,11 +340,11 @@ function Invoke-Start {
         }
     } else {
         if (-not (Test-Path -LiteralPath $Paths.ConfigPath)) {
-            throw 'Notifier is not configured. Run configure-notifier.cmd once.'
+            throw 'Notifier is not configured. Run commands/configure-notifier.cmd once.'
         }
         $config = Get-Content -LiteralPath $Paths.ConfigPath -Raw | ConvertFrom-Json
         if ($config.schemaVersion -ne 2 -or $config.transport -ne 'weixin-ilink' -or -not $config.botToken -or -not $config.baseUrl -or -not $config.toUserId -or -not $config.contextToken) {
-            throw 'Notifier configuration is invalid. Run configure-notifier.cmd again.'
+            throw 'Notifier configuration is invalid. Run commands/configure-notifier.cmd again.'
         }
     }
     $node = Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1
@@ -448,7 +448,7 @@ function Get-JsonCount {
 function Invoke-UseTestAccount {
     param([Parameter(Mandatory = $true)][object]$Paths)
     if (-not (Test-Path -LiteralPath $Paths.TestAccountConfigPath)) {
-        throw 'WeChat test account is not configured. Run configure-wechat-test-account.cmd once.'
+        throw 'WeChat test account is not configured. Run commands/configure-wechat-test-account.cmd once.'
     }
     Set-SelectedTransport -Paths $Paths -Transport 'wechat-test-account'
     Write-Host 'Production transport selected: WeChat Official Account test account.'
@@ -466,7 +466,7 @@ function Invoke-UseIlink {
 function Invoke-UseQQBot {
     param([Parameter(Mandatory = $true)][object]$Paths)
     if (-not (Test-Path -LiteralPath $Paths.QQBotConfigPath)) {
-        throw 'QQ Bot is not configured. Run bind-qqbot.cmd or configure-qqbot.cmd once.'
+        throw 'QQ Bot is not configured. Run bind-qqbot.cmd or commands/configure-qqbot.cmd once.'
     }
     Set-SelectedTransport -Paths $Paths -Transport 'qqbot'
     Write-Host 'Production transport selected: direct QQ Bot with native Gateway.'

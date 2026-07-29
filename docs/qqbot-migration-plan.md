@@ -45,13 +45,13 @@ QQ 平台仍可能存在额度或频率限制，无法从 SDK 推导固定的全
 - `src/adapters/qqbot.mjs`：原生 `fetch` 的 C2C 主动消息 adapter；无 npm 运行依赖、无 OpenClaw 子进程。
 - `src/qqbot-config.mjs` 与 `scripts/qqbot-config.ps1`：只从当前 Windows 用户 DPAPI 读取 AppID、AppSecret、openid。
 - `bind-qqbot.cmd`：一次性原生 QQ Gateway 绑定器，收到一条 C2C 消息后直接 DPAPI 加密保存 OpenID 并退出；不使用 OpenClaw。
-- `configure-qqbot.cmd`、`qqbot-status.cmd`、`test-qqbot.cmd`：手工配置、只读状态、一次短消息 smoke test；均不改当前生产 transport。
-- `start-qqbot-gateway.cmd`、`stop-qqbot-gateway.cmd`、`qqbot-gateway-status.cmd`：只保留为独立诊断工具；生产 watcher 不依赖这些进程。
+- `commands/configure-qqbot.cmd`、`commands/qqbot-status.cmd`、`commands/test-qqbot.cmd`：手工配置、只读状态、一次短消息 smoke test；均不改当前生产 transport。
+- `commands/start-qqbot-gateway.cmd`、`commands/stop-qqbot-gateway.cmd`、`commands/qqbot-gateway-status.cmd`：只保留为独立诊断工具；生产 watcher 不依赖这些进程。
 - `src/qqbot-gateway.mjs`：官方 Gateway Identify、heartbeat、指数退避重连和 `C2C_MSG_RECEIVE` / `C2C_MSG_REJECT` 脱敏状态记录。
 - token 缓存、401 刷新一次、超时、离线、429 Retry-After、不可重试拒绝和敏感信息不外泄的单元测试。
 - outbox 新增 `retryable=false` 和 `retryAfterMs` 的受限处理；既有 iLink context 过期路径不变。
 
-已完成：绑定后免重新绑定、原生 Gateway 两次在线、两次 C2C 主动发送取得消息 ID、用户两次确认 QQ 客户端实收、生产 selector 与 watcher 同进程接入。仍待当前真实 Codex 任务完成后确认 watcher 端到端收件，以及 Desktop/API 错误、CLI 非零、用户中断和离线恢复等完整用例。
+已完成：绑定后免重新绑定、原生 Gateway 两次在线、两次 C2C 主动发送取得消息 ID、生产 selector 与 watcher 同进程接入，以及真实 Codex 根任务的 QQ 客户端端到端收件。仍待 Desktop/API 错误、CLI 非零、用户中断和离线恢复等完整用例。
 
 ## 后续阶段与门禁
 
@@ -66,9 +66,9 @@ QQ 平台仍可能存在额度或频率限制，无法从 SDK 推导固定的全
 
 ### 阶段 2：最小真实 QQ 主动发送
 
-1. 运行 `start-qqbot-gateway.cmd`，并用 `qqbot-gateway-status.cmd` 确认 `Running: yes` 与 `Gateway state: online`。
+1. 运行 `commands/start-qqbot-gateway.cmd`，并用 `commands/qqbot-gateway-status.cmd` 确认 `Running: yes` 与 `Gateway state: online`。
 2. 若在 Gateway 启动前已开启“主动消息”，状态可能是 `unknown`；这是未观察到历史事件，不是权限失败。可在 Gateway 在线时关闭再开启一次以得到 `allowed`，无需重新绑定。
-3. 运行 `test-qqbot.cmd` 发送“Codex QQ 通知链路测试 + 时间戳”。
+3. 运行 `commands/test-qqbot.cmd` 发送“Codex QQ 通知链路测试 + 时间戳”。
 4. 记录仅含 transport、退出状态和脱敏错误类别的本机证据；不打印 token/openid/正文/原始响应。
 5. 等待用户确认 QQ 客户端实际收到。
 6. 停止并重新运行 Gateway 与 smoke test；不重新发送“绑定”，再次等待用户确认。
@@ -92,7 +92,7 @@ QQ 平台仍可能存在额度或频率限制，无法从 SDK 推导固定的全
 
 ### 阶段 4：生产切换（已授权，执行中）
 
-生产 selector 已切换为 `qqbot`，保持同一 watcher、同一 lifecycle supervisor 和同一登录计划任务；没有创建第二套常驻体系。切换前新增 transport pinning：旧 iLink/legacy pending 原地保留，不通过 QQ 重放。任何关键验收失败立即用 `use-ilink.cmd` 回滚。
+生产 selector 已切换为 `qqbot`，保持同一 watcher、同一 lifecycle supervisor 和同一登录计划任务；没有创建第二套常驻体系。切换前新增 transport pinning：旧 iLink/legacy pending 原地保留，不通过 QQ 重放。任何关键验收失败立即用 `commands/use-ilink.cmd` 回滚。
 
 ## 回滚条件
 

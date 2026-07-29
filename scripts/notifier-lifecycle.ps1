@@ -74,9 +74,9 @@ function Invoke-Enable {
         $ilinkConfigPath
     }
     if (-not (Test-Path -LiteralPath $configPath)) {
-        if ($transport -eq 'qqbot') { throw 'QQ Bot is not configured. Run bind-qqbot.cmd or configure-qqbot.cmd once.' }
-        if ($transport -eq 'wechat-test-account') { throw 'WeChat test account is not configured. Run configure-wechat-test-account.cmd once.' }
-        throw 'Notifier is not configured. Run configure-notifier.cmd once.'
+        if ($transport -eq 'qqbot') { throw 'QQ Bot is not configured. Run bind-qqbot.cmd or commands/configure-qqbot.cmd once.' }
+        if ($transport -eq 'wechat-test-account') { throw 'WeChat test account is not configured. Run commands/configure-wechat-test-account.cmd once.' }
+        throw 'Notifier is not configured. Run commands/configure-notifier.cmd once.'
     }
     if (-not (Test-Path -LiteralPath $supervisorScript)) { throw 'Lifecycle supervisor runtime was not found.' }
     Stop-ExistingLifecycle

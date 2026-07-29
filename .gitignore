@@ -8,6 +8,15 @@ logs/
 .env
 .env.*
 config.local.json
+*.dpapi.json
+*.secret.json
+*.credentials.json
+
+# Runtime metadata that must never be published
+*.pid.json
+*.log
+*.log.*
+*.tmp
 
 # Node tooling
 node_modules/
@@ -21,3 +30,5 @@ coverage/
 .idea/
 Thumbs.db
 Desktop.ini
+*.user
+*.suo

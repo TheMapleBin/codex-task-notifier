@@ -374,7 +374,7 @@ function Invoke-Status {
     param([Parameter(Mandatory = $true)][object]$Paths)
     Write-Host "Configured: $(if (Test-Path -LiteralPath $Paths.ConfigPath) { 'yes' } else { 'no' })"
     Write-Host 'Transport: direct QQ Bot HTTPS adapter (no OpenClaw)'
-    Write-Host 'Gateway presence: use qqbot-gateway-status.cmd'
+    Write-Host 'Gateway presence: use commands/qqbot-gateway-status.cmd'
     Write-Host 'Production watcher: unchanged'
 }
 
