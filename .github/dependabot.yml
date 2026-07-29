@@ -1,0 +1,14 @@
+version: 2
+
+# This project has zero npm runtime dependencies and no lockfile, so there is
+# deliberately no "npm" ecosystem entry here. Only GitHub Actions are tracked.
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+    labels:
+      - dependencies
+    open-pull-requests-limit: 5

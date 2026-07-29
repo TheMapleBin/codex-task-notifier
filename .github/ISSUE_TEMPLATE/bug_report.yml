@@ -1,0 +1,133 @@
+name: Bug report
+description: Report a defect in codex-task-notifier
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Before you file this report
+
+        **Never paste credentials or message content into a public issue.**
+
+        Do not include any of the following:
+
+        - QQ Bot AppID, AppSecret, access tokens, or OpenIDs
+        - WeChat iLink tokens, context tokens, user IDs, cookies, or QR material
+        - Codex prompts, assistant output, or any notification body text
+        - Rollout JSONL file contents or outbox records
+        - Anything from `%LOCALAPPDATA%\CodexWeChatNotifier`, including `*.dpapi.json` files
+
+        Describe the *behavior*, not the payload. If a value matters, redact it
+        (for example `AppID: 1024xxxx`) or describe its shape instead of quoting it.
+
+        Suspected security issues should not be filed here. Report them privately
+        through the security advisory link on the new-issue page.
+
+  - type: checkboxes
+    id: no-secrets
+    attributes:
+      label: Credential and content check
+      description: This is required. Please re-read your report before submitting.
+      options:
+        - label: I confirm this report contains no credentials, tokens, OpenIDs, user IDs, Codex prompts, assistant output, rollout JSONL content, or outbox records.
+          required: true
+
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows version
+      description: Run `winver`, or `[System.Environment]::OSVersion.Version` in PowerShell.
+      placeholder: "Windows 11 24H2 (10.0.26100)"
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      description: Output of `node -v`. The project requires Node.js >= 22.5.
+      placeholder: "v22.5.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      description: Which delivery transport was active when the problem happened?
+      options:
+        - QQ Bot (production)
+        - WeChat iLink (fallback)
+        - WeChat official-account test account (fallback)
+        - dry-run adapter
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-mode
+    attributes:
+      label: Install mode
+      description: How was the watcher running?
+      options:
+        - Auto lifecycle (CodexWeChatNotifierLifecycle scheduled task + supervisor)
+        - Manual watcher (started by hand)
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: status-output
+    attributes:
+      label: Sanitized notifier-status.cmd output
+      description: >-
+        Run `notifier-status.cmd` from the repository root and paste the output.
+        This command prints no credentials and no message content, only the
+        watcher, transport, and outbox state. If you also ran
+        `auto-notifier-status.cmd`, you can include that output too.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect the notifier to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: >-
+        What happened instead? Describe the failure (no notification, duplicate
+        notification, wrong task name, wrong status, truncated output, and so on).
+        Use redacted descriptions rather than pasting the notification body.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps, starting from a known state.
+      placeholder: |
+        1. Confirm exactly one watcher is running via `notifier-status.cmd`
+        2. Start a Codex Desktop task in project X
+        3. Let the task finish successfully
+        4. Observe that no notification arrives within N seconds
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: >-
+        Optional. Frequency, whether it reproduces after a Codex restart, recent
+        changes to your setup. Remember the redaction rules above.
+    validations:
+      required: false

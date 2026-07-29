@@ -1,51 +1,69 @@
-<!-- gitnexus:start -->
-# GitNexus — Code Intelligence
+# AGENTS.md
 
-This project is indexed by GitNexus as **codex-openclaw-notifier** (269 symbols, 664 relationships, 22 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This file is the **single canonical source of agent instructions** for this repository.
+Any AI coding agent working here must read it before touching files.
 
-> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
+Tool-specific add-ons live in their own files and must not restate the rules below:
 
-## Always Do
+| File | Scope |
+|------|-------|
+| `AGENTS.md` (this file) | Canonical rules for every agent |
+| `CLAUDE.md` | Claude Code only: GitNexus MCP tool names, resources, and skill files |
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
-- For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
+If a tool-specific file ever disagrees with this one, **this file wins**.
 
-## Never Do
+## Project in one paragraph
 
-- NEVER edit a function, class, or method without first running `impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
-- NEVER commit changes without running `detect_changes()` to check affected scope.
+`codex-task-notifier` is a Windows-only notifier that reports terminal outcomes of
+Codex Desktop/CLI tasks to a chat client. The pipeline is: Codex rollout JSONL ->
+Node watcher (with an in-process native QQ Gateway) -> durable outbox -> QQ Bot
+HTTPS API. There is no separate gateway service, no HTTP proxy, no Codex hook, and
+no CLI injection. Requirements are Windows 10/11 and Node.js >= 22.5, with zero
+runtime npm dependencies (stdlib only).
 
-## Resources
+## Code intelligence
 
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/codex-openclaw-notifier/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/codex-openclaw-notifier/clusters` | All functional areas |
-| `gitnexus://repo/codex-openclaw-notifier/processes` | All execution flows |
-| `gitnexus://repo/codex-openclaw-notifier/process/{name}` | Step-by-step execution trace |
+This project is indexed by GitNexus as **codex-task-notifier** (1208 symbols, 2205
+relationships, 101 execution flows). Use the index instead of blind grepping when you
+need callers, callees, or execution flows.
 
-## CLI
+- Run impact analysis before editing any symbol, and report the blast radius (direct callers, affected processes, risk level) to the user.
+- Warn the user if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- Check the affected scope (changed symbols and execution flows) before committing.
+- Never rename symbols with find-and-replace — use the call-graph-aware rename.
+- For security review, list taint findings (source -> sink flows) for the target symbol; this requires an index built with `analyze --pdg`.
+- For regression review, compare the changed scope against a base ref (`base_ref: "main"`) rather than only the working tree.
+- If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in a terminal first.
 
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+Claude Code users: the exact MCP tool names, MCP resources, and skill files are listed
+in `CLAUDE.md`.
 
-<!-- gitnexus:end -->
+## Repository conventions
+
+Contributor-facing rules — branching, commit style, verification steps, pull request
+expectations — live in `CONTRIBUTING.md`. This file does not repeat them; read both.
+
+- `README.md` is the English primary README. `README.zh-CN.md` is the Chinese translation. Keep the two in sync whenever you change either.
+- Documentation under `docs/` is written in Chinese and indexed by `docs/README.md`. Do not translate the existing Chinese docs.
+- Verify with `npm run check` (a `node --check` syntax gate over every `.mjs` in `src/` and `tests/`), then `npm test` (`node --test`). Note that the suite starts isolated watcher subprocesses; see the Development section of `README.md`.
+- Keep the repo layout as-is: `commands/` (Windows double-click entry points and diagnostics), `docs/` (architecture, acceptance, handoff), `scripts/` (PowerShell config/lifecycle/DPAPI layer, plus the Node syntax gate `check-syntax.mjs`), `src/` (watcher, outbox, event sanitizing, transports), `src/adapters/` (transport adapters), `tests/` (Node behavior tests). The five two-line root `.cmd` shims stay by user decision.
+- Markdown, `.mjs`, `.json`, and YAML files use LF line endings. `.gitattributes` declares `eol=crlf` for `.cmd` and `.ps1`, which materializes on checkout; copies in a working tree created before that rule may still be LF, and must not be hand-converted.
+- Never add a runtime npm dependency.
 
 ## Notification Safety Gate
 
-The current production path is one watcher with a built-in Tencent WeChat iLink adapter. Direct iLink delivery and final assistant output were user-confirmed on 2026-07-28. Read `docs/claude-handoff.md`, `docs/implementation-plan.md`, and `docs/verified-ilink-contract.md` before changes.
+The current production path is one watcher with a built-in native QQ Gateway and the
+QQ Bot HTTPS adapter; QQ Bot delivery was user-confirmed on 2026-07-29 after two real
+active-message acceptances. The previous production path was one watcher with a
+built-in Tencent WeChat iLink adapter; direct iLink delivery and final assistant output
+were user-confirmed on 2026-07-28, and iLink is now retained only as rollback. Read
+`docs/claude-handoff.md`, `docs/implementation-plan.md`, `docs/qqbot-native-gateway.md`,
+and `docs/verified-ilink-contract.md` before changes.
+
+Some bullets below are still phrased in iLink/WeChat terms because that is the transport
+on which they were verified. They remain binding — they state invariants of the retained
+rollback path, and the equivalent invariant holds for the QQ Bot path — but do not read
+them as evidence that iLink is still production. It is not; QQ Bot is.
 
 - Check `notifier-status.cmd` and `auto-notifier-status.cmd` before starting anything. Never run a second watcher, Gateway, service, proxy, or lifecycle schedule.
 - The only approved schedule is `CodexWeChatNotifierLifecycle`, installed by `enable-auto-notifier.cmd`; it may manage only the existing watcher.
@@ -59,6 +77,16 @@ The current production path is one watcher with a built-in Tencent WeChat iLink 
 - Preserve the DPAPI-encrypted iLink runtime session store. Stable UIN, cursor, user ID, and context must never be persisted as plaintext or passed on a command line.
 - Process-level watcher restart recovery passed real WeChat acceptance; a full Windows cold boot remains unverified and must not be reported as complete.
 - Do not change the watcher back to unconditional residency; the user explicitly chose Codex-following start/stop after encrypted session recovery passed.
-- Do not change `C:\Users\TheMapleBin\.codex\config.toml`, `base_url`, or enable `15722`, Stop hook, production CLI wrapper, or API proxy.
+- Do not change `%USERPROFILE%\.codex\config.toml`, `base_url`, or enable `15722`, Stop hook, production CLI wrapper, or API proxy.
 - A real acceptance case still requires event capture, outbox persistence, successful send, and user confirmation. API error, interruption, and offline recovery cases remain incomplete.
 - Keep changes scoped: inspect status/diff, stage only task files, commit locally, do not push, and refresh GitNexus after the commit.
+
+### Not yet accepted
+
+Never describe any of these as done, working, or verified:
+
+- Desktop/API controllable-error case.
+- CLI non-zero exit / API-error case.
+- User-interruption case.
+- QQ Gateway / QQ API offline-recovery case.
+- Full Windows cold-boot recovery.

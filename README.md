@@ -1,70 +1,176 @@
 # Codex Task Notifier
 
-Windows 上的轻量 Codex Desktop/CLI 任务终态通知器。当前生产路径由一个轻量 lifecycle supervisor 和按需 Node watcher 组成：watcher 读取 Codex rollout JSONL、写入持久 outbox，并在同一 Node 进程内维持原生 QQ Gateway 后调用 QQ Bot HTTPS API。没有 OpenClaw 或第二个 Gateway 服务。
+A Windows-only notifier that reports the terminal outcome of your Codex Desktop/CLI tasks to a chat client.
+
+English | [简体中文](README.zh-CN.md)
+
+[![CI](https://github.com/TheMapleBin/codex-task-notifier/actions/workflows/ci.yml/badge.svg)](https://github.com/TheMapleBin/codex-task-notifier/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D22.5-brightgreen.svg)](https://nodejs.org/)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4.svg)](#requirements)
+
+A long Codex task finishes while you are in another window, another app, or away from the desk — and you find out ten minutes later. This tool watches Codex's own rollout log, and pushes one short message when a task you started actually reaches a terminal state.
 
 ```text
-Codex rollout JSONL -> watcher + native QQ Gateway -> durable outbox -> QQ Bot
+Codex rollout JSONL -> Node watcher (in-process QQ Gateway) -> durable outbox -> QQ Bot HTTPS API
 ```
 
-不需要额外消息网关、`account/target`、HTTP 代理、Codex hook 或 CLI 注入。
+No extra message gateway, no HTTP proxy, no Codex hook, no CLI injection, and no change to your Codex configuration.
 
-## 项目结构
+## Features
 
-```text
-commands/       Windows 双击入口、诊断和 transport 切换
-docs/           架构、迁移、验收和代理交接文档
-scripts/        PowerShell 配置、生命周期和 DPAPI 控制层
-src/            watcher、outbox、事件净化和 transport 实现
-src/adapters/   QQ Bot 生产 adapter 与微信备用 adapters
-tests/          Node 与 PowerShell 行为测试
-```
+- **Root tasks only.** Subagent, review, and nested-agent outcomes are filtered out, so you get one message per task you actually started.
+- **Durable outbox.** Every event is written to disk before delivery, deduplicated by content hash, retried with exponential backoff, and pinned to the transport it was queued under.
+- **Newest state wins.** Pending terminal outcomes are superseded by correlation key, so a task never notifies twice with stale status.
+- **DPAPI-encrypted configuration.** Credentials and runtime session state are encrypted per Windows user, never stored as plaintext and never passed on a command line.
+- **Codex-following lifecycle.** One scheduled task starts a lightweight supervisor at logon; the watcher runs only while `codex.exe` is alive and stops 30 seconds after the last one exits. Exactly one watcher is ever allowed.
+- **Sanitized output.** Internal citation/rollout metadata and trailing Codex UI directives are stripped, obvious tokens, cookies, auth headers, passwords and secrets are masked, and the message is capped at 2400 characters.
+- **Pluggable transports.** QQ Bot in production; WeChat iLink, a WeChat official-account test account, and a no-network dry-run adapter are kept as alternatives.
+- **Zero runtime dependencies.** Node standard library only — nothing to `npm install`, nothing to audit.
 
-根目录只保留首次绑定、自动启用、状态和禁用的常用快捷入口。完整命令说明见 [`commands/README.md`](commands/README.md)，文档入口见 [`docs/README.md`](docs/README.md)。
+## Requirements
 
-## 当前状态
+- Windows 10 or Windows 11.
+- Node.js >= 22.5 (the project uses `node:sqlite` and the built-in test runner).
+- A QQ Bot application with C2C/group message events enabled (the `GROUP_AND_C2C_EVENT` intent). You need its AppID and AppSecret.
+- PowerShell 7 (`pwsh.exe`) is preferred; the `.cmd` entry points fall back to Windows PowerShell.
 
-- 2026-07-29 QQ Bot 已完成两次真实主动消息验收：原生 Gateway `READY`、QQ API 返回消息 ID、QQ 客户端两次实际收到。生产 transport 已按用户确认从 iLink 切换为 QQ Bot。
-- QQ watcher 根任务端到端验收已通过；实时计数与未验收项见 [现场验收](docs/live-acceptance.md)，不在首页固化易过期的运行数字。
-- 2026-07-28 已完成 2400 字符输出与 citation/rollout 尾部净化复验，并增加末尾 Codex UI 指令的受限白名单清理。
-- 当前轻量 watcher 已配置；是否运行以 `notifier-status.cmd` 的实时结果为准。QQ transport 下 `QQ Gateway: online` 才表示发送门禁就绪，客户端收件仍以用户确认优先。
-- 自动化验证覆盖直接 iLink、微信公众号测试号备用 adapter、DPAPI 配置、加密会话恢复、ClawBot 心跳、outbox 重试、终态识别、子代理过滤、跟随 Codex 的生命周期、待发终态合并、敏感信息净化、残缺/转义内部元数据、尾部 Codex UI 指令清理和安全任务名称。
-- 尚未完成：Desktop/API 可控错误、CLI 非零/API 错误、用户中断、QQ Gateway/API 离线恢复的全部真实验收。
-- 微信 iLink 与微信公众号测试号 DPAPI 配置保留为回滚，不删除、不自动重放。QQ Bot 同样不需要 OpenClaw 或 `account/target`。
-- 从未启用：OpenClaw（及其 Gateway）、`15722`、`base_url` 切换、Stop hook、生产 CLI wrapper 或新服务。唯一计划任务在用户登录时启动轻量 supervisor；watcher 只在 Codex Desktop/CLI 运行时存在。ClawBot 保活仅在回滚到 iLink transport 时启用，QQ 生产路径不执行微信保活。
-- QQ Bot adapter 与最小原生 Gateway 已接入同一个 watcher 生命周期：Codex 启动时跟随 watcher 启动，Codex 全部退出 30 秒后一起停止；DPAPI 绑定跨重启保留。Gateway 离线时任务仍进入 outbox，恢复 `READY` 后重试。
-- outbox 记录固定到入队时的 transport。2026-07-29 切换时现场发现 `legacy=79`、`ilink=5` 条历史 pending；它们保留原地且不会通过 QQ 重放。新 QQ 记录只由 QQ adapter 处理。
-- ClawBot 保活已通过短窗口真实验收：未重新发送“绑定”，连续保活约 4 分钟后主动发送成功，用户确认微信实际收到。整机冷启动和更长周期仍需后续观察。
+## Quick start
 
-通知包含来源、项目、任务名称、状态、耗时、短任务 ID、净化错误类别/HTTP 状态和最后一条 assistant 输出。输出最多 2400 字符；完整、残缺或 HTML 转义的内部 citation/rollout 元数据，以及末尾独立行中的 `::git-commit`、`::created-thread`、`::code-comment` 会在截断前移除。正文中的普通 `::` 保留，明显 token、Cookie、认证头、密码和 secret 会被遮盖。
+The five `.cmd` files in the repository root are two-line convenience shims that `call` the real scripts in [`commands/`](commands/README.md). Anything they do is also reachable directly from `commands/`.
 
-只通知用户直接创建的根任务。Codex Desktop/CLI 调用的子代理、评审代理和嵌套代理终态默认全部忽略。
-
-任务名称优先使用 Codex 数据库中的显式 `threads.name`，否则使用 Codex UI 的 `threads.title`；名称会限长并进行敏感值净化。
-
-## 一键使用
-
-QQ 首次配置使用根目录 `bind-qqbot.cmd`，只需向机器人发送一次“绑定”。根目录保留常用快捷入口，完整命令集中在 [`commands/`](commands/README.md)。生产切换使用 `commands/use-qqbot.cmd`；回滚 iLink 使用 `commands/use-ilink.cmd`；测试号备用路径使用 `commands/use-wechat-test-account.cmd`。
-
-- `commands/start-notifier.cmd`：启动唯一隐藏 watcher。
-- `notifier-status.cmd`：显示运行状态和 outbox 计数，不显示凭据或消息正文。
-- `commands/stop-notifier.cmd`：只停止该启动器记录的 watcher。
-- `enable-auto-notifier.cmd`：启用跟随 Codex 的自动生命周期。
-- `auto-notifier-status.cmd`：查看自动模式、supervisor 和计划任务状态。
-- `disable-auto-notifier.cmd`：移除自动模式并停止 supervisor 与 watcher。
-
-QQ Bot 使用 `bind-qqbot.cmd` 完成一次性绑定：它只在本次操作中短暂连接官方 QQ Gateway，等你向机器人发“绑定”后立即将 OpenID 加密保存并退出。`commands/test-qqbot.cmd` 会在同一短命进程中连接 Gateway、发送、关闭，用于独立验收。`commands/start-qqbot-gateway.cmd` 等命令只保留为诊断工具，生产模式不运行该独立进程。
-
-自动模式沿用原有的一个当前用户登录计划任务和一个轻量 supervisor。Codex Desktop/CLI 任一运行时启动 watcher 与内置 QQ Gateway；全部退出 30 秒后一起停止。QQ 凭据和目标由当前 Windows 用户 DPAPI 持久保存，不需要每次重新绑定。QQ transport 下 iLink/ClawBot keepalive 为 `not used`，不会发起微信保活请求。
-
-运行目录为 `%LOCALAPPDATA%\CodexWeChatNotifier`。
-
-完整文档入口见 [文档导航](docs/README.md)；微信公众号测试号配置和真实实发步骤见 [微信公众号测试号接入](docs/wechat-test-account-trial.md)。
-
-## 验证
+**1. Clone and verify the checkout.**
 
 ```powershell
+git clone https://github.com/TheMapleBin/codex-task-notifier
+cd codex-task-notifier
 npm run check
 npm test
 ```
 
-接手前从 [文档导航](docs/README.md) 阅读实施计划、交接说明、现场验收和受控接入文档。
+There is no `npm install` step — the project has zero runtime dependencies. `npm test` briefly spawns isolated watcher processes as test subjects; see [Development](#development) for what that does and does not touch.
+
+**2. Bind the QQ Bot once.**
+
+```powershell
+.\bind-qqbot.cmd
+```
+
+Enter the AppID and AppSecret at the prompt (never paste them onto a command line). When the script reports it is listening, send the bot a single message — `绑定` works — from the QQ account that should receive notifications. The OpenID is captured from that message, DPAPI-encrypted, and the script exits.
+
+**3. Select the QQ Bot transport.**
+
+```powershell
+.\commands\use-qqbot.cmd
+.\commands\qqbot-status.cmd
+```
+
+Do not skip this. The transport selector has no neutral default: with nothing pinned, `Get-SelectedTransport` in `scripts/notifier-control.ps1` resolves to `weixin-ilink`, so starting the watcher either fails with `Notifier is not configured` or — if an older iLink configuration is still present — really delivers over WeChat iLink. `dry-run` is only the default in `src/config.mjs` for a bare `node src/index.mjs watch` with no adapter in the environment; no `.cmd` or supervisor path reaches it. `qqbot-status.cmd` reports presence of configuration, never values.
+
+**4. Enable the Codex-following lifecycle.**
+
+```powershell
+.\enable-auto-notifier.cmd
+```
+
+**5. Check state.**
+
+```powershell
+.\notifier-status.cmd
+.\auto-notifier-status.cmd
+```
+
+`notifier-status.cmd` shows the watcher, `QQ Gateway: online`, and outbox counts — no credentials, no message bodies. Then run one real Codex task and confirm the notification arrives in your QQ client.
+
+To remove it: `.\disable-auto-notifier.cmd` unregisters the scheduled task and stops the supervisor and watcher. It does not delete the DPAPI binding.
+
+## How it works
+
+1. The scheduled task `CodexWeChatNotifierLifecycle` starts `src/lifecycle-supervisor.mjs` at logon.
+2. The supervisor polls for `codex.exe` and starts/stops the single watcher through `scripts/notifier-control.ps1`, using a 30-second idle grace period.
+3. `src/session-watcher.mjs` tails `rollout-*.jsonl` under the Codex sessions directory, reading only appended bytes, and drops any session marked as a subagent.
+4. Terminal outcomes (`turn_finished`, `task_error`, `turn_interrupted`) are extracted; `src/thread-name.mjs` resolves the task name from the Codex state database — explicit `threads.name` first, else the UI `threads.title`.
+5. `src/event.mjs` normalizes the event: metadata stripping, credential redaction, task-name and 2400-character output caps, and a deterministic event id.
+6. `src/notifier-service.mjs` supersedes any pending record for the same correlation key, then `src/outbox.mjs` writes the record atomically to `outbox\pending`.
+7. A dispatch tick calls `outbox.processDue()`; `src/adapters/qqbot.mjs` waits for the in-process `src/qqbot-gateway.mjs` client to reach `READY`, then delivers over the QQ Bot HTTPS API.
+8. Success moves the record to `outbox\delivered`; failures stay pending with exponential backoff and land in `outbox\failed` after the attempt limit.
+
+## Repository layout
+
+```text
+commands/       Windows double-click entry points, diagnostics, transport switching
+docs/           Architecture, migration, acceptance and handoff docs (Chinese)
+scripts/        PowerShell configuration, lifecycle and DPAPI control layer, plus the Node syntax gate
+src/            Watcher, outbox, event sanitizing, transports
+src/adapters/   QQ Bot production adapter plus WeChat and dry-run adapters
+tests/          Node behavior tests (node --test)
+```
+
+## Configuration
+
+Runtime state lives in `%LOCALAPPDATA%\CodexWeChatNotifier` — configuration, the outbox directories, the watcher PID file, and redacted status files. Credentials and runtime session state are encrypted with Windows DPAPI, scoped to the current user; they are never written as plaintext and never appear on a command line.
+
+Transport is switched with a single command and takes effect the next time the watcher starts:
+
+| Command | Transport |
+| --- | --- |
+| `commands/use-qqbot.cmd` | `qqbot` — production |
+| `commands/use-ilink.cmd` | `weixin-ilink` — rollback |
+| `commands/use-wechat-test-account.cmd` | `wechat-test-account` — rollback |
+| *(none pinned)* | falls back to `weixin-ilink` — **not** a no-op; see [Quick start](#quick-start) step 3 |
+| *(manual only)* `CODEX_NOTIFY_ADAPTER=dry-run` | `dry-run` — formats and discards |
+
+Existing WeChat iLink and test-account configurations are kept for rollback. They are never deleted and never replayed automatically. Advanced behaviour (sessions directory, poll interval, retry window, adapter override) is driven by `CODEX_NOTIFY_*` environment variables read in `src/config.mjs`.
+
+## Privacy and safety
+
+- Never logged, printed, or committed: bot tokens and secrets, context tokens, user IDs, QR material, Codex prompts, and request/response bodies.
+- Notification content is limited to source, project, task name, status, duration, short task id, a sanitized error class/HTTP status, and the last assistant message.
+- The sanitizers remove complete, orphaned, and HTML-escaped internal citation/rollout metadata, and strip only the allowlisted trailing standalone Codex UI directives `::git-commit`, `::created-thread`, and `::code-comment` — ordinary `::` text in the body is preserved. Obvious tokens, cookies, auth headers, passwords, and secrets are masked. The 2400-character cap is applied last.
+- Only root tasks you created are notified; subagent and review-agent outcomes are dropped.
+- Exactly one watcher may run. Do not start a second watcher, gateway service, proxy, or lifecycle schedule.
+
+See [SECURITY.md](SECURITY.md) for reporting a vulnerability.
+
+## Status
+
+Production transport is **QQ Bot**, user-accepted on 2026-07-29 after two real active-message deliveries and one end-to-end root-task notification.
+
+Still unverified — do not treat these as working:
+
+- [ ] Desktop/API controllable-error case
+- [ ] CLI non-zero exit and API-error case
+- [ ] User-interruption case
+- [ ] QQ Gateway/API offline-then-recovery case
+- [ ] Full Windows cold-boot recovery
+
+Detailed per-case evidence, live counts, and historical operational notes live in [docs/live-acceptance.md](docs/live-acceptance.md). The documentation index is [docs/README.md](docs/README.md).
+
+## Development
+
+```powershell
+npm run check   # node --check over every .mjs in src/ and tests/
+npm test        # node --test
+```
+
+Tests use the Node built-in test runner (`node:test`) with no test framework and no runtime dependencies. CI runs both commands on `windows-latest` with Node 22.
+
+Note what the suite actually does: several cases shell out to the PowerShell scripts in `scripts/` and exercise them as subjects, and `tests/notifier-control.test.mjs` calls `notifier-control.ps1 -Action Start`, which launches a real hidden `node src/index.mjs watch` child process. Those watchers are isolated — a temporary `CODEX_NOTIFY_CONTROL_HOME` and sessions directory, DPAPI-protected placeholder credentials, iLink keepalive polling disabled — so they never read your real Codex rollouts, never deliver a message anywhere, and are stopped in a `finally` block. Because they use their own control home, they neither observe nor stop the production watcher, so the suite is safe to run while the lifecycle is enabled. The "exactly one watcher" rule in [Privacy and safety](#privacy-and-safety) is about the production watcher.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+If you are an AI coding agent — or you are directing one at this repository — read [AGENTS.md](AGENTS.md) first. It is the canonical rule file and holds the Notification Safety Gate: the invariants that keep this tool from starting a second watcher, leaking credentials, or weakening the output sanitizers.
+
+## Security
+
+Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md). Never include credentials, tokens, or message contents in an issue.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+[MIT](LICENSE) © 2026 TheMapleBin

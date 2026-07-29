@@ -1,0 +1,65 @@
+name: Feature request
+description: Propose an improvement to codex-task-notifier
+title: "[feature] "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing an improvement. Please keep the request free of
+        credentials, OpenIDs, user IDs, Codex prompts, assistant output, rollout
+        JSONL content, and outbox records.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: >-
+        What is hard, missing, or surprising today? Describe the situation you
+        run into, not the implementation you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: >-
+        What behavior would you like instead? If it touches notification content,
+        say which fields change and how sanitizing and the 2400-character cap
+        would still be honored.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: >-
+        Other approaches you thought about, including workarounds you already use
+        and why they are not enough.
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: >-
+        Optional. Which transport this concerns (QQ Bot, WeChat iLink, WeChat test
+        account, dry-run), whether it affects Codex Desktop, Codex CLI, or both.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Project constraints
+      description: These constraints are load-bearing and are not up for negotiation in a feature request.
+      options:
+        - label: I understand the project has zero runtime npm dependencies (Node standard library only) and my proposal does not require adding one.
+          required: true
+        - label: I understand exactly one watcher may ever run, managed by the single `CodexWeChatNotifierLifecycle` scheduled task, and my proposal does not add another watcher, service, proxy, or scheduled task.
+          required: true
+        - label: I understand this is a Windows-only tool and credentials stay DPAPI-encrypted, never plaintext and never passed on a command line.
+          required: true

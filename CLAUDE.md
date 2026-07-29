@@ -1,34 +1,44 @@
+# CLAUDE.md
+
+**The canonical agent rules for this repository live in [AGENTS.md](AGENTS.md). Read it first.**
+
+`AGENTS.md` holds the project overview, the repository conventions, and the
+safety-critical **Notification Safety Gate**. Those rules are deliberately *not*
+duplicated here so the two files cannot drift apart. If this file and `AGENTS.md`
+ever disagree, `AGENTS.md` wins.
+
+This file only adds the Claude-Code-specific GitNexus MCP workflow.
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **codex-openclaw-notifier** (269 symbols, 664 relationships, 22 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **codex-task-notifier** (1208 symbols, 2205 relationships, 101 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
-> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
+> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
 ## Always Do
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
-- For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
+- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
 
 ## Never Do
 
-- NEVER edit a function, class, or method without first running `impact` on it.
+- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
 - NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
-- NEVER commit changes without running `detect_changes()` to check affected scope.
+- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
+- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
 
 ## Resources
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/codex-openclaw-notifier/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/codex-openclaw-notifier/clusters` | All functional areas |
-| `gitnexus://repo/codex-openclaw-notifier/processes` | All execution flows |
-| `gitnexus://repo/codex-openclaw-notifier/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/codex-task-notifier/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/codex-task-notifier/clusters` | All functional areas |
+| `gitnexus://repo/codex-task-notifier/processes` | All execution flows |
+| `gitnexus://repo/codex-task-notifier/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 
@@ -43,22 +53,8 @@ This project is indexed by GitNexus as **codex-openclaw-notifier** (269 symbols,
 
 <!-- gitnexus:end -->
 
-## Notification Safety Gate
+## Reminder
 
-The current production path is one watcher with a built-in Tencent WeChat iLink adapter. Direct iLink delivery and final assistant output were user-confirmed on 2026-07-28. Read `docs/claude-handoff.md`, `docs/implementation-plan.md`, and `docs/verified-ilink-contract.md` before changes.
-
-- Check `notifier-status.cmd` and `auto-notifier-status.cmd` before starting anything. Never run a second watcher, Gateway, service, proxy, or lifecycle schedule.
-- The only approved schedule is `CodexWeChatNotifierLifecycle`, installed by `enable-auto-notifier.cmd`; it may manage only the existing watcher.
-- Never read, print, log, commit, or request bot tokens, context tokens, user IDs, QR material, prompts, messages, source text, or request/response bodies.
-- Task names use explicit `threads.name` first, then the Codex UI `threads.title`; always apply length limits and credential redaction.
-- Never notify subagent completion; filter session metadata carrying parent thread, subagent thread source, agent path, or subagent source markers.
-- Sanitize complete, orphaned, and HTML-escaped citation/rollout metadata before applying the final-output length limit. Also remove only allowlisted Codex UI directives (`::git-commit`, `::created-thread`, `::code-comment`) when they are standalone trailing lines; preserve ordinary `::` text in the body.
-- The 2400-character output and metadata-tail sanitizer passed real WeChat display acceptance; do not reduce the limit or remove these filters without a new regression case.
-- Keep the lightweight supervisor-driven lifecycle: start the watcher when any `codex.exe` is active and stop it 30 seconds after all Codex processes exit.
-- Coalesce pending terminal outcomes by correlation key so only the newest state for one task consumes a refreshed iLink context.
-- Preserve the DPAPI-encrypted iLink runtime session store. Stable UIN, cursor, user ID, and context must never be persisted as plaintext or passed on a command line.
-- Process-level watcher restart recovery passed real WeChat acceptance; a full Windows cold boot remains unverified and must not be reported as complete.
-- Do not change the watcher back to unconditional residency; the user explicitly chose Codex-following start/stop after encrypted session recovery passed.
-- Do not change `C:\Users\TheMapleBin\.codex\config.toml`, `base_url`, or enable `15722`, Stop hook, production CLI wrapper, or API proxy.
-- A real acceptance case still requires event capture, outbox persistence, successful send, and user confirmation. API error, interruption, and offline recovery cases remain incomplete.
-- Keep changes scoped: inspect status/diff, stage only task files, commit locally, do not push, and refresh GitNexus after the commit.
+Running `gitnexus_detect_changes()` is not a substitute for the Notification Safety
+Gate in [AGENTS.md](AGENTS.md). Re-read that section before any change to the watcher,
+the outbox, the sanitizers, the lifecycle, or a transport adapter.

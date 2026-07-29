@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/TheMapleBin/codex-task-notifier/security/advisories/new
+    about: >-
+      Do not open a public issue for security problems. Report credential
+      leakage, DPAPI or session-store weaknesses, or notification content
+      exposure privately through a GitHub security advisory. See SECURITY.md.
