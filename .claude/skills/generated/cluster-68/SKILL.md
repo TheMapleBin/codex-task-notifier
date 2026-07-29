@@ -1,9 +1,9 @@
 ---
-name: cluster-19
-description: "Skill for the Cluster_19 area of codex-openclaw-notifier. 7 symbols across 1 files."
+name: cluster-68
+description: "Skill for the Cluster_68 area of codex-task-notifier. 7 symbols across 1 files."
 ---
 
-# Cluster_19
+# Cluster_68
 
 7 symbols | 1 files | Cohesion: 92%
 
@@ -11,7 +11,7 @@ description: "Skill for the Cluster_19 area of codex-openclaw-notifier. 7 symbol
 
 - Working with code in `src/`
 - Understanding how report, handler, upstreamRequest work
-- Modifying cluster_19-related functionality
+- Modifying cluster_68-related functionality
 
 ## Key Files
 
@@ -44,17 +44,20 @@ Start here when exploring this area:
 | Flow | Type | Steps |
 |------|------|-------|
 | `Handler → CleanText` | cross_community | 5 |
+| `UpstreamRequest → CleanText` | cross_community | 5 |
 | `Handler → AsIsoTimestamp` | cross_community | 4 |
 | `Handler → ComputeId` | cross_community | 4 |
+| `UpstreamRequest → AsIsoTimestamp` | cross_community | 4 |
+| `UpstreamRequest → ComputeId` | cross_community | 4 |
 
 ## Connected Areas
 
 | Area | Connections |
 |------|-------------|
-| Cluster_15 | 1 calls |
+| Cluster_65 | 1 calls |
 
 ## How to Explore
 
 1. `gitnexus_context({name: "report"})` — see callers and callees
-2. `gitnexus_query({query: "cluster_19"})` — find related execution flows
+2. `gitnexus_query({query: "cluster_68"})` — find related execution flows
 3. Read key files listed above for implementation details

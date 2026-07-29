@@ -1,9 +1,9 @@
 ---
-name: cluster-18
-description: "Skill for the Cluster_18 area of codex-openclaw-notifier. 7 symbols across 1 files."
+name: cluster-67
+description: "Skill for the Cluster_67 area of codex-task-notifier. 7 symbols across 1 files."
 ---
 
-# Cluster_18
+# Cluster_67
 
 7 symbols | 1 files | Cohesion: 80%
 
@@ -11,7 +11,7 @@ description: "Skill for the Cluster_18 area of codex-openclaw-notifier. 7 symbol
 
 - Working with code in `src/`
 - Understanding how runCodexExec, JsonlParser work
-- Modifying cluster_18-related functionality
+- Modifying cluster_67-related functionality
 
 ## Key Files
 
@@ -23,7 +23,7 @@ description: "Skill for the Cluster_18 area of codex-openclaw-notifier. 7 symbol
 
 Start here when exploring this area:
 
-- **`runCodexExec`** (Function) — `src/cli-wrapper.mjs:88`
+- **`runCodexExec`** (Function) — `src/cli-wrapper.mjs:101`
 - **`JsonlParser`** (Class) — `src/cli-wrapper.mjs:7`
 
 ## Key Symbols
@@ -31,12 +31,12 @@ Start here when exploring this area:
 | Symbol | Type | File | Line |
 |--------|------|------|------|
 | `JsonlParser` | Class | `src/cli-wrapper.mjs` | 7 |
-| `runCodexExec` | Function | `src/cli-wrapper.mjs` | 88 |
+| `runCodexExec` | Function | `src/cli-wrapper.mjs` | 101 |
 | `terminalFromRecord` | Function | `src/cli-wrapper.mjs` | 45 |
-| `normalizedExecArgs` | Function | `src/cli-wrapper.mjs` | 60 |
-| `exitCodeForSignal` | Function | `src/cli-wrapper.mjs` | 66 |
-| `terminalForExit` | Function | `src/cli-wrapper.mjs` | 70 |
-| `main` | Function | `src/cli-wrapper.mjs` | 136 |
+| `normalizedExecArgs` | Function | `src/cli-wrapper.mjs` | 73 |
+| `exitCodeForSignal` | Function | `src/cli-wrapper.mjs` | 79 |
+| `terminalForExit` | Function | `src/cli-wrapper.mjs` | 83 |
+| `main` | Function | `src/cli-wrapper.mjs` | 150 |
 
 ## Execution Flows
 
@@ -51,12 +51,12 @@ Start here when exploring this area:
 
 | Area | Connections |
 |------|-------------|
-| Cluster_17 | 1 calls |
+| Cluster_66 | 1 calls |
 | Tests | 1 calls |
-| Cluster_12 | 1 calls |
+| Cluster_53 | 1 calls |
 
 ## How to Explore
 
 1. `gitnexus_context({name: "runCodexExec"})` — see callers and callees
-2. `gitnexus_query({query: "cluster_18"})` — find related execution flows
+2. `gitnexus_query({query: "cluster_67"})` — find related execution flows
 3. Read key files listed above for implementation details
