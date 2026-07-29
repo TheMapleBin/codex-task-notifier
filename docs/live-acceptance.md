@@ -4,7 +4,7 @@
 
 ## 已通过
 
-| 用例 | 捕获 | outbox | 发送 | 微信确认 | 说明 |
+| 用例 | 捕获 | outbox | 发送 | 客户端确认 | 说明 |
 | --- | --- | --- | --- | --- | --- |
 | Codex Desktop 正常完成（直接 iLink） | 通过 | 通过 | 通过 | 通过 | 两条 pending 转 delivered，用户确认收到；其中一条包含最终输出 |
 | Codex 正常完成（微信公众号测试号生产路径） | 通过 | 通过 | 通过 | 通过 | 用户确认连续收到两条“Codex 通知”；现场计数 Pending 0 / Delivered 40 / Failed 2 |
@@ -13,6 +13,7 @@
 | ClawBot 保活跨短期失效窗口 | 不适用 | 不适用 | 通过 | 通过 | 未重新绑定，约 4 分钟内每 30 秒保活；随后发送返回 message ID，用户确认收到 |
 | QQ Bot 原生 Gateway 独立实发 | 不适用 | 不适用 | 通过 | 通过 | Gateway online、API 返回 message ID，用户确认 QQ 客户端收到 |
 | QQ Bot watcher 同进程 adapter 实发 | 不适用 | 不适用 | 通过 | 通过 | adapter 等待 Gateway READY 后发送并关闭，用户第二次确认 QQ 客户端收到 |
+| Codex 根任务正常完成（QQ Bot 生产路径） | 通过 | 通过 | 通过 | 通过 | 唯一 watcher 捕获本任务终态并通过同进程 Gateway 主动发送；用户确认 QQ 客户端实际收到 |
 
 直接 iLink 验收期间未修改 `C:\Users\TheMapleBin\.codex\config.toml`、`base_url` 或 `15722`。
 
@@ -30,7 +31,7 @@
 
 2026-07-29 生产 selector 已切换为 QQ Bot：唯一 watcher 内嵌原生 QQ Gateway，唯一 `CodexWeChatNotifierLifecycle` supervisor 正常运行，iLink keepalive 为 `not used`。不得启用代理、hook、wrapper、第二个 watcher、OpenClaw Gateway、服务或其他计划任务。微信 iLink 与微信公众号测试号配置保留为回滚。
 
-切换现场旧 outbox 为 `legacy=79`、`ilink=5`、`qqbot=0`；transport pinning 保证这 84 条历史 pending 原地保留且不会通过 QQ 重放。切换后 `Delivered` 保持 68、`Failed` 保持 2，没有历史通知洪发。当前真实 Codex 根任务结束通知仍待用户确认，确认前不得把 watcher 端到端用例标为通过。
+切换现场旧 outbox 为 `legacy=79`、`ilink=5`、`qqbot=0`；transport pinning 保证这 84 条历史 pending 原地保留且不会通过 QQ 重放。根任务验收时仍为 `Pending=84`、`Failed=2`，其中 `Delivered=70`（`legacy=68`、`qqbot=2`），没有历史通知洪发。QQ Gateway 状态为 `online`、`active messages: allowed`；用户已确认真实 Codex 根任务结束通知在 QQ 客户端收到，因此 watcher 生产端到端正常完成用例通过。
 
 两条 failed 是切换前已经耗尽最大尝试次数的旧 iLink 记录，outbox 在调用测试号 adapter 前即将其移入 failed。它们不构成测试号发送失败证据；未经用户明确授权，不读取正文、不重放、不删除。
 
