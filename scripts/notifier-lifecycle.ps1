@@ -20,6 +20,23 @@ $controlRoot = if ($env:CODEX_NOTIFY_CONTROL_HOME) {
 }
 $pidPath = Join-Path $controlRoot 'run\lifecycle.pid.json'
 $logPath = Join-Path $controlRoot 'logs\lifecycle.log'
+$transportPath = Join-Path $controlRoot 'secure\active-transport.json'
+$ilinkConfigPath = Join-Path $controlRoot 'secure\weixin-ilink.dpapi.json'
+$testAccountConfigPath = Join-Path $controlRoot 'secure\wechat-test-account.dpapi.json'
+$qqBotConfigPath = Join-Path $controlRoot 'secure\qqbot.dpapi.json'
+
+function Get-SelectedTransport {
+    if (-not (Test-Path -LiteralPath $transportPath)) { return 'weixin-ilink' }
+    try {
+        $selection = Get-Content -LiteralPath $transportPath -Raw | ConvertFrom-Json
+        if ($selection.schemaVersion -ne 1 -or $selection.transport -notin @('weixin-ilink', 'wechat-test-account', 'qqbot')) {
+            throw 'invalid'
+        }
+        [string]$selection.transport
+    } catch {
+        throw 'Notifier transport selection is invalid.'
+    }
+}
 
 function Get-LifecycleProcess {
     if (-not (Test-Path -LiteralPath $pidPath)) { return $null }
@@ -48,8 +65,19 @@ function Invoke-NotifierStop {
 }
 
 function Invoke-Enable {
-    $configPath = Join-Path $controlRoot 'secure\weixin-ilink.dpapi.json'
-    if (-not (Test-Path -LiteralPath $configPath)) { throw 'Notifier is not configured. Run configure-notifier.cmd once.' }
+    $transport = Get-SelectedTransport
+    $configPath = if ($transport -eq 'qqbot') {
+        $qqBotConfigPath
+    } elseif ($transport -eq 'wechat-test-account') {
+        $testAccountConfigPath
+    } else {
+        $ilinkConfigPath
+    }
+    if (-not (Test-Path -LiteralPath $configPath)) {
+        if ($transport -eq 'qqbot') { throw 'QQ Bot is not configured. Run bind-qqbot.cmd or configure-qqbot.cmd once.' }
+        if ($transport -eq 'wechat-test-account') { throw 'WeChat test account is not configured. Run configure-wechat-test-account.cmd once.' }
+        throw 'Notifier is not configured. Run configure-notifier.cmd once.'
+    }
     if (-not (Test-Path -LiteralPath $supervisorScript)) { throw 'Lifecycle supervisor runtime was not found.' }
     Stop-ExistingLifecycle
     $node = (Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source

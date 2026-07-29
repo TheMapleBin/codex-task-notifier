@@ -31,6 +31,50 @@ test("outbox deduplicates, retries, and eventually delivers", async () => {
   assert.deepEqual(await outbox.counts(), { pending: 0, delivered: 1, failed: 0, incoming: 0 });
 });
 
+test("outbox pins records to the selected transport and never replays iLink work through QQ", async () => {
+  const home = await temporaryDirectory();
+  const ilinkOutbox = new Outbox(testConfig(home, { adapter: "ilink" }));
+  await ilinkOutbox.init();
+  await ilinkOutbox.enqueue(createEvent({ source: "session-watcher", kind: "turn_finished", turnId: "turn-ilink-pending" }));
+
+  const qqOutbox = new Outbox(testConfig(home, { adapter: "qqbot" }));
+  await qqOutbox.init();
+  let qqSends = 0;
+  await qqOutbox.processDue({ send: async () => { qqSends += 1; } }, new Date(Date.now() + 1_000));
+  assert.equal(qqSends, 0);
+  assert.deepEqual(await qqOutbox.counts(), { pending: 1, delivered: 0, failed: 0, incoming: 0 });
+
+  await qqOutbox.enqueue(createEvent({ source: "session-watcher", kind: "turn_finished", turnId: "turn-qq-pending" }));
+  await qqOutbox.processDue({ send: async () => { qqSends += 1; } }, new Date(Date.now() + 2_000));
+  assert.equal(qqSends, 1);
+  assert.deepEqual(await qqOutbox.counts(), { pending: 1, delivered: 1, failed: 0, incoming: 0 });
+});
+
+test("legacy unpinned records remain eligible only for iLink", async () => {
+  const home = await temporaryDirectory();
+  const ilinkOutbox = new Outbox(testConfig(home, { adapter: "ilink" }));
+  await ilinkOutbox.init();
+  await ilinkOutbox.enqueue(createEvent({ source: "session-watcher", kind: "turn_finished", turnId: "turn-legacy-pending" }));
+  const pendingDirectory = path.join(home, "outbox", "pending");
+  const fileName = (await fs.readdir(pendingDirectory))[0];
+  const recordPath = path.join(pendingDirectory, fileName);
+  const legacy = JSON.parse(await fs.readFile(recordPath, "utf8"));
+  delete legacy.transport;
+  legacy.schemaVersion = 1;
+  await fs.writeFile(recordPath, `${JSON.stringify(legacy)}\n`, "utf8");
+
+  const qqOutbox = new Outbox(testConfig(home, { adapter: "qqbot" }));
+  let qqSends = 0;
+  await qqOutbox.processDue({ send: async () => { qqSends += 1; } }, new Date(Date.now() + 1_000));
+  assert.equal(qqSends, 0);
+  assert.equal((await qqOutbox.counts()).pending, 1);
+
+  let ilinkSends = 0;
+  await ilinkOutbox.processDue({ send: async () => { ilinkSends += 1; } }, new Date(Date.now() + 2_000));
+  assert.equal(ilinkSends, 1);
+  assert.deepEqual(await ilinkOutbox.counts(), { pending: 0, delivered: 1, failed: 0, incoming: 0 });
+});
+
 test("outbox moves explicitly non-retryable delivery failures to failed without exhausting retries", async () => {
   const home = await temporaryDirectory();
   const outbox = new Outbox(testConfig(home));

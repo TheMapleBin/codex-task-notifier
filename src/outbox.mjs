@@ -91,6 +91,17 @@ function retryDelayForError(record, config, error) {
   return retryDelayMs(record, config);
 }
 
+function belongsToActiveTransport(record, activeTransport) {
+  // Records written before transport pinning existed were all created while
+  // production used iLink. Keep that narrow compatibility path so an iLink
+  // restart can still drain them, but never replay them through a newly chosen
+  // transport such as QQ Bot.
+  if (typeof record?.transport !== "string" || !record.transport) {
+    return activeTransport === "ilink";
+  }
+  return record.transport === activeTransport;
+}
+
 export class Outbox {
   constructor(config) {
     this.config = config;
@@ -124,7 +135,8 @@ export class Outbox {
     }
 
     const record = {
-      schemaVersion: 1,
+      schemaVersion: 2,
+      transport: this.config.adapter,
       event: normalizedEvent,
       createdAt: nowIso(),
       attempts: 0,
@@ -183,6 +195,7 @@ export class Outbox {
     for (const filePath of await listJsonFiles(this.pendingDirectory)) {
       try {
         const record = await readJson(filePath);
+        if (!belongsToActiveTransport(record, this.config.adapter)) continue;
         if (!isContextBlockedRecord(record)) continue;
         if (new Date(record.nextAttemptAt).getTime() <= now.getTime()) continue;
         await replaceJson(filePath, { ...record, nextAttemptAt });
@@ -214,6 +227,8 @@ export class Outbox {
         await this.#moveToFailed(filePath, { malformed: true });
         continue;
       }
+
+      if (!belongsToActiveTransport(record, this.config.adapter)) continue;
 
       if (new Date(record.nextAttemptAt).getTime() > now.getTime()) continue;
       if (record.attempts >= this.config.maxAttempts) {

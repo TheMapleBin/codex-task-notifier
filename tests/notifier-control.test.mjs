@@ -133,6 +133,41 @@ test("production control starts the watcher with protected WeChat test-account c
   }
 });
 
+test("production control selects QQ Bot without exposing its protected configuration", async () => {
+  const controlHome = await temporaryDirectory();
+  const secureDirectory = path.join(controlHome, "secure");
+  await fs.mkdir(secureDirectory, { recursive: true });
+  const configPath = path.join(secureDirectory, "qqbot.dpapi.json");
+  await fs.writeFile(configPath, JSON.stringify({
+    schemaVersion: 1,
+    transport: "qqbot",
+    appId: "opaque-app-id",
+    appSecret: "opaque-app-secret",
+    openId: "opaque-open-id"
+  }));
+  const env = { ...process.env, CODEX_NOTIFY_CONTROL_HOME: controlHome };
+
+  const selected = runControl("UseQQBot", env);
+  assert.equal(selected.status, 0, selected.stderr);
+  assert.match(selected.stdout, /direct QQ Bot/);
+  assert.doesNotMatch(`${selected.stdout}${selected.stderr}`, /opaque-/);
+  assert.deepEqual(
+    JSON.parse(await fs.readFile(path.join(secureDirectory, "active-transport.json"), "utf8")).transport,
+    "qqbot"
+  );
+
+  const status = runControl("Status", env);
+  assert.equal(status.status, 0, status.stderr);
+  assert.match(status.stdout, /direct QQ Bot with native Gateway/);
+  assert.match(status.stdout, /ClawBot keepalive: not used/);
+  assert.doesNotMatch(`${status.stdout}${status.stderr}`, /opaque-/);
+
+  const keepAlive = runControl("KeepAlive", env);
+  assert.equal(keepAlive.status, 0, keepAlive.stderr);
+  const keepAliveStatus = JSON.parse(await fs.readFile(path.join(controlHome, "run", "ilink-keepalive-status.json"), "utf8"));
+  assert.equal(keepAliveStatus.code, "not_used");
+});
+
 test("ClawBot keepalive records only sanitized status", async () => {
   const controlHome = await temporaryDirectory();
   const fixturePath = path.join(controlHome, "keepalive.json");

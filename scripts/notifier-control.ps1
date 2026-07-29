@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Configure', 'Start', 'Stop', 'Status', 'KeepAlive', 'UseTestAccount', 'UseIlink')]
+    [ValidateSet('Configure', 'Start', 'Stop', 'Status', 'KeepAlive', 'UseTestAccount', 'UseIlink', 'UseQQBot')]
     [string]$Action
 )
 
@@ -21,11 +21,13 @@ function Get-ControlPaths {
         SecureDirectory = Join-Path $root 'secure'
         ConfigPath = Join-Path $root 'secure\weixin-ilink.dpapi.json'
         TestAccountConfigPath = Join-Path $root 'secure\wechat-test-account.dpapi.json'
+        QQBotConfigPath = Join-Path $root 'secure\qqbot.dpapi.json'
         TransportPath = Join-Path $root 'secure\active-transport.json'
         RuntimeHome = Join-Path $root 'live'
         RunDirectory = Join-Path $root 'run'
         PidPath = Join-Path $root 'run\watcher.pid.json'
         KeepAliveStatusPath = Join-Path $root 'run\ilink-keepalive-status.json'
+        QQBotGatewayStatusPath = Join-Path $root 'run\qqbot-gateway-status.json'
         LogDirectory = Join-Path $root 'logs'
         StdoutPath = Join-Path $root 'logs\watcher.out.log'
         StderrPath = Join-Path $root 'logs\watcher.err.log'
@@ -77,7 +79,7 @@ function Get-SelectedTransport {
     if (-not (Test-Path -LiteralPath $Paths.TransportPath)) { return 'weixin-ilink' }
     try {
         $selection = Get-Content -LiteralPath $Paths.TransportPath -Raw | ConvertFrom-Json
-        if ($selection.schemaVersion -ne 1 -or $selection.transport -notin @('weixin-ilink', 'wechat-test-account')) {
+        if ($selection.schemaVersion -ne 1 -or $selection.transport -notin @('weixin-ilink', 'wechat-test-account', 'qqbot')) {
             throw 'invalid'
         }
         [string]$selection.transport
@@ -89,7 +91,7 @@ function Get-SelectedTransport {
 function Set-SelectedTransport {
     param(
         [Parameter(Mandatory = $true)][object]$Paths,
-        [Parameter(Mandatory = $true)][ValidateSet('weixin-ilink', 'wechat-test-account')][string]$Transport
+        [Parameter(Mandatory = $true)][ValidateSet('weixin-ilink', 'wechat-test-account', 'qqbot')][string]$Transport
     )
     Set-PrivateDirectoryAcl -Path $Paths.SecureDirectory
     Write-JsonAtomic -Path $Paths.TransportPath -Value ([ordered]@{
@@ -320,7 +322,15 @@ function Invoke-Start {
         return
     }
     $transport = Get-SelectedTransport -Paths $Paths
-    if ($transport -eq 'wechat-test-account') {
+    if ($transport -eq 'qqbot') {
+        if (-not (Test-Path -LiteralPath $Paths.QQBotConfigPath)) {
+            throw 'QQ Bot is not configured. Run bind-qqbot.cmd or configure-qqbot.cmd once.'
+        }
+        $config = Get-Content -LiteralPath $Paths.QQBotConfigPath -Raw | ConvertFrom-Json
+        if ($config.schemaVersion -ne 1 -or $config.transport -ne 'qqbot' -or -not $config.appId -or -not $config.appSecret -or -not $config.openId) {
+            throw 'QQ Bot configuration is invalid. Run bind-qqbot.cmd or configure-qqbot.cmd again.'
+        }
+    } elseif ($transport -eq 'wechat-test-account') {
         if (-not (Test-Path -LiteralPath $Paths.TestAccountConfigPath)) {
             throw 'WeChat test account is not configured. Run configure-wechat-test-account.cmd once.'
         }
@@ -356,19 +366,27 @@ function Invoke-Start {
         'CODEX_NOTIFY_ILINK_TO_USER_ID',
         'CODEX_NOTIFY_ILINK_CONTEXT_TOKEN',
         'CODEX_NOTIFY_WECHAT_TEST_CONFIG',
+        'CODEX_NOTIFY_QQBOT_CONFIG',
+        'CODEX_NOTIFY_QQBOT_GATEWAY_STATUS',
         'CODEX_NOTIFY_POWERSHELL',
         'CODEX_NOTIFY_HOME'
     )
     $previous = @{}
     foreach ($name in $names) { $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
     try {
-        if ($transport -eq 'wechat-test-account') {
+        if ($transport -eq 'qqbot' -or $transport -eq 'wechat-test-account') {
             $powerShellCommand = Get-Command pwsh.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($null -eq $powerShellCommand) {
                 $powerShellCommand = Get-Command powershell.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1
             }
-            $env:CODEX_NOTIFY_ADAPTER = 'wechat-test-account'
-            $env:CODEX_NOTIFY_WECHAT_TEST_CONFIG = $Paths.TestAccountConfigPath
+            if ($transport -eq 'qqbot') {
+                $env:CODEX_NOTIFY_ADAPTER = 'qqbot'
+                $env:CODEX_NOTIFY_QQBOT_CONFIG = $Paths.QQBotConfigPath
+                $env:CODEX_NOTIFY_QQBOT_GATEWAY_STATUS = $Paths.QQBotGatewayStatusPath
+            } else {
+                $env:CODEX_NOTIFY_ADAPTER = 'wechat-test-account'
+                $env:CODEX_NOTIFY_WECHAT_TEST_CONFIG = $Paths.TestAccountConfigPath
+            }
             $env:CODEX_NOTIFY_POWERSHELL = $powerShellCommand.Source
         } else {
             $botToken = Unprotect-Value ([string]$config.botToken)
@@ -445,6 +463,15 @@ function Invoke-UseIlink {
     Write-Host 'Production transport selected: direct WeChat iLink.'
 }
 
+function Invoke-UseQQBot {
+    param([Parameter(Mandatory = $true)][object]$Paths)
+    if (-not (Test-Path -LiteralPath $Paths.QQBotConfigPath)) {
+        throw 'QQ Bot is not configured. Run bind-qqbot.cmd or configure-qqbot.cmd once.'
+    }
+    Set-SelectedTransport -Paths $Paths -Transport 'qqbot'
+    Write-Host 'Production transport selected: direct QQ Bot with native Gateway.'
+}
+
 function Write-KeepAliveStatus {
     param(
         [Parameter(Mandatory = $true)][object]$Paths,
@@ -462,6 +489,10 @@ function Write-KeepAliveStatus {
 
 function Invoke-IlinkKeepAlive {
     param([Parameter(Mandatory = $true)][object]$Paths)
+    if ((Get-SelectedTransport -Paths $Paths) -ne 'weixin-ilink') {
+        Write-KeepAliveStatus -Paths $Paths -Ok $true -Code 'not_used'
+        return
+    }
     if ($env:CODEX_NOTIFY_ILINK_KEEPALIVE_FIXTURE) {
         $fixture = Get-Content -LiteralPath $env:CODEX_NOTIFY_ILINK_KEEPALIVE_FIXTURE -Raw | ConvertFrom-Json
         $ok = $fixture.ok -eq $true
@@ -553,27 +584,52 @@ function Invoke-Status {
     )
     $process = Get-WatcherProcess -Paths $Paths -RepositoryRoot $RepositoryRoot
     $transport = Get-SelectedTransport -Paths $Paths
-    $configured = if ($transport -eq 'wechat-test-account') {
+    $configured = if ($transport -eq 'qqbot') {
+        Test-Path -LiteralPath $Paths.QQBotConfigPath
+    } elseif ($transport -eq 'wechat-test-account') {
         Test-Path -LiteralPath $Paths.TestAccountConfigPath
     } else {
         Test-Path -LiteralPath $Paths.ConfigPath
     }
     Write-Host "Configured: $(if ($configured) { 'yes' } else { 'no' })"
-    Write-Host "Transport: $(if ($transport -eq 'wechat-test-account') { 'WeChat Official Account test account' } else { 'direct WeChat iLink' })"
+    $transportLabel = if ($transport -eq 'qqbot') {
+        'direct QQ Bot with native Gateway'
+    } elseif ($transport -eq 'wechat-test-account') {
+        'WeChat Official Account test account'
+    } else {
+        'direct WeChat iLink'
+    }
+    Write-Host "Transport: $transportLabel"
     Write-Host "Running: $(if ($null -ne $process) { 'yes' } else { 'no' })"
     if ($null -ne $process) { Write-Host "PID: $($process.ProcessId)" }
     Write-Host "Pending: $(Get-JsonCount (Join-Path $Paths.RuntimeHome 'outbox\pending'))"
     Write-Host "Delivered: $(Get-JsonCount (Join-Path $Paths.RuntimeHome 'outbox\delivered'))"
     Write-Host "Failed: $(Get-JsonCount (Join-Path $Paths.RuntimeHome 'outbox\failed'))"
-    if (Test-Path -LiteralPath $Paths.KeepAliveStatusPath) {
+    if ($transport -eq 'weixin-ilink' -and (Test-Path -LiteralPath $Paths.KeepAliveStatusPath)) {
         try {
             $keepAlive = Get-Content -LiteralPath $Paths.KeepAliveStatusPath -Raw | ConvertFrom-Json
             Write-Host "ClawBot keepalive: $(if ($keepAlive.ok) { 'ok' } else { 'failed' }) ($($keepAlive.checkedAt))"
         } catch {
             Write-Host 'ClawBot keepalive: unknown'
         }
-    } else {
+    } elseif ($transport -eq 'weixin-ilink') {
         Write-Host 'ClawBot keepalive: not checked'
+    } else {
+        Write-Host 'ClawBot keepalive: not used'
+    }
+    if ($transport -eq 'qqbot') {
+        try {
+            $gateway = Get-Content -LiteralPath $Paths.QQBotGatewayStatusPath -Raw | ConvertFrom-Json
+            if ($gateway.schemaVersion -ne 1 -or $gateway.state -notin @('starting', 'connecting', 'online', 'backoff', 'blocked', 'stopped') -or $gateway.activeMessaging -notin @('unknown', 'allowed', 'rejected')) {
+                throw 'invalid'
+            }
+            Write-Host "QQ Gateway: $($gateway.state), active messages: $($gateway.activeMessaging)"
+            if ($gateway.code -and [string]$gateway.code -match '^QQBOT_GATEWAY_[A-Z0-9_]{1,64}$') {
+                Write-Host "QQ Gateway code: $($gateway.code)"
+            }
+        } catch {
+            Write-Host 'QQ Gateway: not reported'
+        }
     }
     Write-Host "Logs: $($Paths.LogDirectory)"
 }
@@ -590,6 +646,7 @@ try {
         'KeepAlive' { Invoke-IlinkKeepAlive -Paths $paths }
         'UseTestAccount' { Invoke-UseTestAccount -Paths $paths }
         'UseIlink' { Invoke-UseIlink -Paths $paths }
+        'UseQQBot' { Invoke-UseQQBot -Paths $paths }
     }
 } catch {
     [Console]::Error.WriteLine("Notifier control failed: $($_.Exception.Message)")

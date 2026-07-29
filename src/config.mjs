@@ -151,7 +151,15 @@ export function loadConfig(env = process.env) {
         min: 1_000,
         max: 300_000,
         name: "CODEX_NOTIFY_QQBOT_TIMEOUT_MS"
-      })
+      }),
+      gatewayReadyTimeoutMs: integerFromEnv(env.CODEX_NOTIFY_QQBOT_GATEWAY_READY_TIMEOUT_MS, 30_000, {
+        min: 1_000,
+        max: 300_000,
+        name: "CODEX_NOTIFY_QQBOT_GATEWAY_READY_TIMEOUT_MS"
+      }),
+      gatewayStatusPath: env.CODEX_NOTIFY_QQBOT_GATEWAY_STATUS
+        ? path.resolve(env.CODEX_NOTIFY_QQBOT_GATEWAY_STATUS)
+        : null
     }),
     retryBaseMs,
     retryMaxMs: integerFromEnv(env.CODEX_NOTIFY_RETRY_MAX_MS, 1_800_000, {

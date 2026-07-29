@@ -56,6 +56,39 @@ class FakeWebSocket {
   }
 }
 
+class HelloOnlyWebSocket {
+  static OPEN = 1;
+  static instances = [];
+
+  constructor(url) {
+    this.url = url;
+    this.readyState = HelloOnlyWebSocket.OPEN;
+    this.listeners = new Map();
+    this.sent = [];
+    HelloOnlyWebSocket.instances.push(this);
+  }
+
+  addEventListener(type, callback) {
+    const callbacks = this.listeners.get(type) || [];
+    callbacks.push(callback);
+    this.listeners.set(type, callbacks);
+  }
+
+  emit(type, event) {
+    for (const callback of this.listeners.get(type) || []) callback(event);
+  }
+
+  send(value) {
+    this.sent.push(JSON.parse(value));
+  }
+
+  close() {
+    if (this.readyState === 3) return;
+    this.readyState = 3;
+    queueMicrotask(() => this.emit("close", { code: 1000 }));
+  }
+}
+
 function fetchForGateway({ closeFirst = false } = {}) {
   let gatewayRequests = 0;
   return async (url) => {
@@ -64,6 +97,28 @@ function fetchForGateway({ closeFirst = false } = {}) {
     return response({ url: `wss://gateway.example.test/${closeFirst ? gatewayRequests : "one"}` });
   };
 }
+
+test("native QQ Gateway becomes online only after READY, not merely after HELLO", async () => {
+  HelloOnlyWebSocket.instances = [];
+  const statuses = [];
+  const gateway = createQQBotGateway({
+    credentials: async () => ({ appId: "test-app", appSecret: "test-secret" }),
+    fetchImpl: fetchForGateway(),
+    WebSocketImpl: HelloOnlyWebSocket,
+    onStatus: async (status) => { statuses.push(status); }
+  });
+  const running = gateway.run();
+  await waitFor(() => HelloOnlyWebSocket.instances.length === 1);
+  const socket = HelloOnlyWebSocket.instances[0];
+  socket.emit("message", { data: JSON.stringify({ op: 10, d: { heartbeat_interval: 60_000 } }) });
+  await waitFor(() => socket.sent.some((entry) => entry.op === 2));
+  assert.equal(statuses.some((status) => status.state === "online"), false);
+  socket.emit("message", { data: JSON.stringify({ op: 0, s: 1, t: "READY", d: {} }) });
+  await gateway.waitUntilOnline({ timeoutMs: 1_000 });
+  assert.equal(statuses.some((status) => status.state === "online"), true);
+  gateway.stop();
+  assert.deepEqual(await running, { state: "stopped", code: null });
+});
 
 test("native QQ Gateway identifies, records active-message permission, and never records C2C content", async () => {
   FakeWebSocket.instances = [];

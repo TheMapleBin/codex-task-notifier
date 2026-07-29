@@ -24,6 +24,53 @@ function response(value, { ok = true, status = 200, retryAfter = null } = {}) {
   };
 }
 
+function createOnlineGatewayFactory() {
+  return ({ onStatus }) => {
+    let state = "stopped";
+    let activeMessaging = "unknown";
+    let finish = null;
+    return Object.freeze({
+      run() {
+        state = "online";
+        Promise.resolve(onStatus({
+          schemaVersion: 1,
+          state,
+          activeMessaging,
+          updatedAt: "2026-07-29T00:00:00.000Z",
+          code: null
+        })).catch(() => {});
+        return new Promise((resolve) => { finish = resolve; });
+      },
+      waitUntilOnline: async () => {},
+      async setActiveMessaging(value) {
+        activeMessaging = value;
+        await onStatus({
+          schemaVersion: 1,
+          state,
+          activeMessaging,
+          updatedAt: "2026-07-29T00:00:00.000Z",
+          code: null
+        });
+      },
+      stop() {
+        state = "stopped";
+        finish?.({ state, code: null });
+      },
+      get state() { return state; },
+      get activeMessaging() { return activeMessaging; }
+    });
+  };
+}
+
+function createAdapter(t, configuration, options = {}) {
+  const adapter = createQQBotAdapter(configuration, {
+    gatewayFactory: createOnlineGatewayFactory(),
+    ...options
+  });
+  t.after(() => adapter.close());
+  return adapter;
+}
+
 const event = {
   source: "session-watcher",
   kind: "turn_finished",
@@ -34,9 +81,9 @@ const event = {
   finalOutput: "safe output"
 };
 
-test("direct QQ Bot adapter obtains a token and sends a proactive C2C text message", async () => {
+test("direct QQ Bot adapter obtains a token and sends a proactive C2C text message", async (t) => {
   const requests = [];
-  const adapter = createQQBotAdapter(config(), { fetchImpl: async (url, options) => {
+  const adapter = createAdapter(t, config(), { fetchImpl: async (url, options) => {
     requests.push({ url: String(url), options });
     if (String(url).includes("/app/getAppAccessToken")) return response({ access_token: "test-access-token", expires_in: 7200 });
     return response({ id: "qq-message-1" });
@@ -57,8 +104,8 @@ test("direct QQ Bot adapter obtains a token and sends a proactive C2C text messa
   assert.equal(Object.hasOwn(body, "msg_id"), false);
 });
 
-test("direct QQ Bot adapter requires an API message-ID receipt", async () => {
-  const adapter = createQQBotAdapter(config(), { fetchImpl: async (url) => {
+test("direct QQ Bot adapter requires an API message-ID receipt", async (t) => {
+  const adapter = createAdapter(t, config(), { fetchImpl: async (url) => {
     if (String(url).includes("/app/getAppAccessToken")) return response({ access_token: "token", expires_in: 7200 });
     return response({ timestamp: "2026-07-28T23:30:00+08:00" });
   }});
@@ -68,9 +115,9 @@ test("direct QQ Bot adapter requires an API message-ID receipt", async () => {
   );
 });
 
-test("direct QQ Bot adapter caches access tokens", async () => {
+test("direct QQ Bot adapter caches access tokens", async (t) => {
   let tokenRequests = 0;
-  const adapter = createQQBotAdapter(config(), { fetchImpl: async (url) => {
+  const adapter = createAdapter(t, config(), { fetchImpl: async (url) => {
     if (String(url).includes("/app/getAppAccessToken")) {
       tokenRequests += 1;
       return response({ access_token: "cached-token", expires_in: 7200 });
@@ -82,10 +129,10 @@ test("direct QQ Bot adapter caches access tokens", async () => {
   assert.equal(tokenRequests, 1);
 });
 
-test("direct QQ Bot adapter refreshes an invalid access token once", async () => {
+test("direct QQ Bot adapter refreshes an invalid access token once", async (t) => {
   let tokenRequests = 0;
   let sendRequests = 0;
-  const adapter = createQQBotAdapter(config(), { fetchImpl: async (url) => {
+  const adapter = createAdapter(t, config(), { fetchImpl: async (url) => {
     if (String(url).includes("/app/getAppAccessToken")) {
       tokenRequests += 1;
       return response({ access_token: `token-${tokenRequests}`, expires_in: 7200 });
@@ -100,16 +147,16 @@ test("direct QQ Bot adapter refreshes an invalid access token once", async () =>
   assert.equal(sendRequests, 2);
 });
 
-test("direct QQ Bot adapter sanitizes rejected credentials and upstream details", async () => {
-  const adapter = createQQBotAdapter(config(), { fetchImpl: async () => response({ message: "test-app-secret and sensitive upstream response" }, { ok: false, status: 401 }) });
+test("direct QQ Bot adapter sanitizes rejected credentials and upstream details", async (t) => {
+  const adapter = createAdapter(t, config(), { fetchImpl: async () => response({ message: "test-app-secret and sensitive upstream response" }, { ok: false, status: 401 }) });
   await assert.rejects(
     () => adapter.send(event),
     (error) => error.code === "QQBOT_TOKEN_AUTH_FAILED" && error.retryable === false && !/secret|sensitive/i.test(error.message)
   );
 });
 
-test("direct QQ Bot adapter marks HTTP 429 as retryable and honors Retry-After", async () => {
-  const adapter = createQQBotAdapter(config(), { fetchImpl: async (url) => {
+test("direct QQ Bot adapter marks HTTP 429 as retryable and honors Retry-After", async (t) => {
+  const adapter = createAdapter(t, config(), { fetchImpl: async (url) => {
     if (String(url).includes("/app/getAppAccessToken")) return response({ access_token: "token", expires_in: 7200 });
     return response({ message: "sensitive upstream response" }, { ok: false, status: 429, retryAfter: "3" });
   }});
@@ -119,8 +166,8 @@ test("direct QQ Bot adapter marks HTTP 429 as retryable and honors Retry-After",
   );
 });
 
-test("direct QQ Bot adapter reports a sanitized timeout", async () => {
-  const adapter = createQQBotAdapter(config({ timeoutMs: 10 }), { fetchImpl: async (_url, options) => new Promise((resolve, reject) => {
+test("direct QQ Bot adapter reports a sanitized timeout", async (t) => {
+  const adapter = createAdapter(t, config({ timeoutMs: 10 }), { fetchImpl: async (_url, options) => new Promise((resolve, reject) => {
     options.signal.addEventListener("abort", () => {
       const error = new Error("secret timeout detail");
       error.name = "AbortError";
@@ -130,9 +177,9 @@ test("direct QQ Bot adapter reports a sanitized timeout", async () => {
   await assert.rejects(() => adapter.send(event), (error) => error.code === "QQBOT_TOKEN_TIMEOUT" && !/secret/.test(error.message));
 });
 
-test("direct QQ Bot adapter loads DPAPI-protected credentials once during start", async () => {
+test("direct QQ Bot adapter loads DPAPI-protected credentials once during start", async (t) => {
   let reads = 0;
-  const adapter = createQQBotAdapter({ qqbot: { configPath: "C:\\secure\\qqbot.dpapi.json", timeoutMs: 1_000 } }, {
+  const adapter = createAdapter(t, { qqbot: { configPath: "C:\\secure\\qqbot.dpapi.json", timeoutMs: 1_000 } }, {
     credentialStore: { read: async () => {
       reads += 1;
       return { appId: "stored-app", appSecret: "stored-secret", openId: "stored-user" };
@@ -147,4 +194,46 @@ test("direct QQ Bot adapter loads DPAPI-protected credentials once during start"
   await adapter.start();
   await adapter.send(event);
   assert.equal(reads, 1);
+});
+
+test("QQ Bot adapter starts without waiting for Gateway and gates only delivery on READY", async (t) => {
+  let state = "connecting";
+  let activeMessaging = "unknown";
+  let releaseReady;
+  let finishRun;
+  const ready = new Promise((resolve) => { releaseReady = resolve; });
+  const running = new Promise((resolve) => { finishRun = resolve; });
+  const requests = [];
+  const adapter = createQQBotAdapter(config(), {
+    fetchImpl: async (url) => {
+      requests.push(String(url));
+      if (String(url).includes("/app/getAppAccessToken")) {
+        return response({ access_token: "test-token", expires_in: 7200 });
+      }
+      return response({ id: "qq-message-gated" });
+    },
+    gatewayFactory: () => Object.freeze({
+      run: () => running,
+      waitUntilOnline: () => ready,
+      async setActiveMessaging(value) { activeMessaging = value; },
+      stop() {
+        state = "stopped";
+        finishRun({ state, code: null });
+      },
+      get state() { return state; },
+      get activeMessaging() { return activeMessaging; }
+    })
+  });
+  t.after(() => adapter.close());
+
+  await adapter.start();
+  assert.equal(requests.length, 0, "startup must not wait for or send through QQ");
+  const sending = adapter.send(event);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(requests.length, 0, "delivery must remain gated until Gateway READY");
+
+  state = "online";
+  releaseReady();
+  assert.deepEqual(await sending, { transport: "qqbot-direct", exitCode: 0, messageId: "qq-message-gated" });
+  assert.equal(requests.length, 2);
 });
